@@ -1,1448 +1,1233 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Autobot - Crypto Trading Dashboard</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Autobot — Trading Bot</title>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2"></script>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+
 <style>
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-:root {
-  --bg-primary: #0a0a1a;
-  --bg-secondary: #1a1a2e;
-  --glass-bg: rgba(255, 255, 255, 0.04);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-hover: rgba(0, 212, 255, 0.12);
-  --accent: #00d4ff;
-  --accent-dim: rgba(0, 212, 255, 0.2);
-  --profit: #00ff88;
-  --loss: #ff4757;
-  --warning: #ffa502;
-  --text-primary: #e8e8e8;
-  --text-secondary: #888;
-  --text-muted: #555;
-  --chart-grid: rgba(255, 255, 255, 0.04);
-  --radius: 16px;
-  --radius-sm: 10px;
-}
-
-html { font-size: 14px; }
-
-body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-  color: var(--text-primary);
-  min-height: 100vh;
-  overflow-x: hidden;
-}
-
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 3px; }
-
-/* --- HEADER --- */
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 28px;
-  background: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(20px);
-  border-bottom: 1px solid var(--glass-border);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.logo {
-  font-size: 1.4rem;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  background: linear-gradient(135deg, var(--accent), #7b61ff);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.logo span {
-  font-weight: 300;
-  -webkit-text-fill-color: var(--text-secondary);
-}
-
-.price-ticker {
-  display: flex;
-  gap: 16px;
-}
-
-.ticker-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.85rem;
-}
-
-.ticker-symbol {
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.ticker-price { font-variant-numeric: tabular-nums; }
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.badge {
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.badge-dryrun { background: rgba(255, 165, 2, 0.15); color: var(--warning); border: 1px solid rgba(255, 165, 2, 0.3); }
-.badge-live { background: rgba(0, 255, 136, 0.15); color: var(--profit); border: 1px solid rgba(0, 255, 136, 0.3); }
-
-.uptime {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  font-family: 'JetBrains Mono', monospace;
-}
-
-.ws-indicator {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--loss);
-  transition: background 0.3s;
-}
-
-.ws-indicator.connected {
-  background: var(--profit);
-  box-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-/* --- GLASS CARD --- */
-.glass {
-  background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius);
-  padding: 20px;
-  transition: border-color 0.3s, box-shadow 0.3s;
-}
-
-.glass:hover {
-  border-color: rgba(0, 212, 255, 0.15);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
-}
-
-/* --- LAYOUT --- */
-.main {
-  max-width: 1600px;
-  margin: 0 auto;
-  padding: 20px 28px 40px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-/* Status cards row */
-.stats-row {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-}
-
-.stat-card {
-  position: relative;
-  overflow: hidden;
-}
-
-.stat-card::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  border-radius: 3px 0 0 3px;
-}
-
-.stat-card.positive::before { background: var(--profit); }
-.stat-card.negative::before { background: var(--loss); }
-.stat-card.neutral::before { background: var(--accent); }
-.stat-card.warning-state::before { background: var(--warning); }
-
-.stat-label {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 8px;
-}
-
-.stat-value {
-  font-size: 1.8rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  font-family: 'JetBrains Mono', 'Inter', monospace;
-  letter-spacing: -0.02em;
-}
-
-.stat-value.profit { color: var(--profit); }
-.stat-value.loss { color: var(--loss); }
-
-.stat-change {
-  font-size: 0.75rem;
-  margin-top: 4px;
-  color: var(--text-secondary);
-}
-
-/* Chart + Positions row */
-.chart-positions-row {
-  display: grid;
-  grid-template-columns: 3fr 2fr;
-  gap: 16px;
-  min-height: 420px;
-}
-
-.chart-card { padding: 16px; }
-
-.chart-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.chart-title {
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.chart-tabs {
-  display: flex;
-  gap: 4px;
-}
-
-.chart-tab {
-  padding: 4px 14px;
-  border-radius: 8px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid var(--glass-border);
-  background: transparent;
-  color: var(--text-secondary);
-  transition: all 0.2s;
-}
-
-.chart-tab.active {
-  background: var(--accent-dim);
-  color: var(--accent);
-  border-color: rgba(0, 212, 255, 0.3);
-}
-
-.chart-tab:hover:not(.active) { border-color: var(--text-muted); color: var(--text-primary); }
-
-#price-chart { width: 100%; height: 360px; }
-
-/* Positions panel */
-.positions-panel { display: flex; flex-direction: column; gap: 12px; }
-
-.panel-title {
-  font-size: 0.9rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.panel-title .count {
-  background: var(--accent-dim);
-  color: var(--accent);
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 0.7rem;
-  font-weight: 600;
-}
-
-.position-card {
-  padding: 16px;
-  border-radius: var(--radius-sm);
-}
-
-.position-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.position-symbol {
-  font-weight: 600;
-  font-size: 0.95rem;
-}
-
-.position-side {
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 0.65rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  background: rgba(0, 255, 136, 0.12);
-  color: var(--profit);
-}
-
-.position-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.position-field-label {
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-}
-
-.position-field-value {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.8rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.r-multiple {
-  font-weight: 700;
-  font-size: 1rem;
-}
-
-.no-positions {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  gap: 8px;
-  flex: 1;
-}
-
-.no-positions-icon { font-size: 2rem; opacity: 0.3; }
-
-/* Equity curve */
-.equity-card { padding: 16px; }
-.equity-chart-wrapper { position: relative; height: 200px; width: 100%; }
-#equity-chart { position: absolute; top: 0; left: 0; width: 100% !important; height: 100% !important; }
-
-/* Bottom row: trades + circuit breakers */
-.bottom-row {
-  display: grid;
-  grid-template-columns: 3fr 2fr;
-  gap: 16px;
-}
-
-/* Trades table */
-.trades-card { padding: 16px; overflow-x: auto; }
-
-.trades-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.8rem;
-}
-
-.trades-table th {
-  text-align: left;
-  padding: 10px 12px;
-  color: var(--text-secondary);
-  font-weight: 500;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-bottom: 1px solid var(--glass-border);
-}
-
-.trades-table td {
-  padding: 10px 12px;
-  font-family: 'JetBrains Mono', monospace;
-  font-variant-numeric: tabular-nums;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-  font-size: 0.78rem;
-}
-
-.trades-table tr:hover { background: rgba(255, 255, 255, 0.02); }
-
-.trades-table .pnl-positive { color: var(--profit); }
-.trades-table .pnl-negative { color: var(--loss); }
-
-.exit-badge {
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 0.65rem;
-  font-weight: 500;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-secondary);
-}
-
-/* Circuit breakers + signals */
-.right-panel { display: flex; flex-direction: column; gap: 16px; }
-
-.cb-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 8px;
-}
-
-.cb-item {
-  padding: 12px;
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.cb-label {
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-  margin-bottom: 6px;
-}
-
-.cb-value {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.cb-status {
-  margin-top: 12px;
-  padding: 10px 16px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.8rem;
-  font-weight: 500;
-}
-
-.cb-status.ok { background: rgba(0, 255, 136, 0.08); color: var(--profit); border: 1px solid rgba(0, 255, 136, 0.15); }
-.cb-status.paused { background: rgba(255, 165, 2, 0.08); color: var(--warning); border: 1px solid rgba(255, 165, 2, 0.15); }
-.cb-status.killed { background: rgba(255, 71, 87, 0.08); color: var(--loss); border: 1px solid rgba(255, 71, 87, 0.15); }
-
-.cb-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-/* Signals log */
-.signals-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 260px;
-  overflow-y: auto;
-  margin-top: 8px;
-}
-
-.signal-item {
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.02);
-  border-left: 3px solid var(--accent);
-  font-size: 0.78rem;
-}
-
-.signal-item.entry { border-left-color: var(--profit); }
-.signal-item.exit { border-left-color: var(--loss); }
-
-.signal-time {
-  font-size: 0.65rem;
-  color: var(--text-muted);
-  font-family: 'JetBrains Mono', monospace;
-  margin-bottom: 3px;
-}
-
-.signal-symbol {
-  font-weight: 600;
-  color: var(--accent);
-  margin-right: 6px;
-}
-
-.signal-text { color: var(--text-secondary); }
-
-/* --- NAV TABS --- */
-.nav-tabs {
-  display: flex;
-  gap: 4px;
-  margin-left: 24px;
-}
-
-.nav-tab {
-  padding: 6px 18px;
-  border-radius: 8px;
-  font-size: 0.8rem;
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid var(--glass-border);
-  background: transparent;
-  color: var(--text-secondary);
-  transition: all 0.2s;
-}
-
-.nav-tab.active {
-  background: var(--accent-dim);
-  color: var(--accent);
-  border-color: rgba(0, 212, 255, 0.3);
-}
-
-.nav-tab:hover:not(.active) { border-color: var(--text-muted); color: var(--text-primary); }
-
-.tab-content { display: none; }
-.tab-content.active { display: flex; flex-direction: column; gap: 20px; }
-
-/* --- BACKTEST PAGE --- */
-.bt-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.bt-input {
-  padding: 8px 14px;
-  border-radius: 8px;
-  border: 1px solid var(--glass-border);
-  background: rgba(255,255,255,0.04);
-  color: var(--text-primary);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.8rem;
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-.bt-input:focus { border-color: var(--accent); }
-
-.bt-select {
-  padding: 8px 14px;
-  border-radius: 8px;
-  border: 1px solid var(--glass-border);
-  background: rgba(255,255,255,0.04);
-  color: var(--text-primary);
-  font-size: 0.8rem;
-  outline: none;
-  cursor: pointer;
-}
-
-.bt-btn {
-  padding: 8px 24px;
-  border-radius: 8px;
-  border: none;
-  background: linear-gradient(135deg, var(--accent), #7b61ff);
-  color: #fff;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.2s, transform 0.1s;
-}
-
-.bt-btn:hover { opacity: 0.9; }
-.bt-btn:active { transform: scale(0.97); }
-.bt-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.bt-status {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-}
-
-.bt-metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 12px;
-}
-
-.bt-metric-card {
-  padding: 16px;
-  border-radius: var(--radius-sm);
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.05);
-}
-
-.bt-metric-label {
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 6px;
-}
-
-.bt-metric-value {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 1.1rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.bt-equity-wrapper { position: relative; height: 250px; width: 100%; }
-#bt-equity-chart { position: absolute; top: 0; left: 0; width: 100% !important; height: 100% !important; }
-
-/* Loading shimmer */
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-.loading {
-  background: linear-gradient(90deg, var(--glass-bg) 25%, rgba(255,255,255,0.08) 50%, var(--glass-bg) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-  border-radius: 8px;
-  min-height: 40px;
-}
-
-/* Responsive */
-@media (max-width: 1100px) {
-  .chart-positions-row { grid-template-columns: 1fr; }
-  .bottom-row { grid-template-columns: 1fr; }
-  .stats-row { grid-template-columns: repeat(2, 1fr); }
-}
-
-@media (max-width: 600px) {
-  .stats-row { grid-template-columns: 1fr; }
-  .header { flex-direction: column; gap: 12px; }
-  .main { padding: 12px; }
-}
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #f7f5f1;
+    --surface:   #ffffff;
+    --surface-2: #faf8f4;
+    --ink:       #18181b;
+    --ink-2:     #3f3f46;
+    --muted:     #78716c;
+    --faint:     #a8a29e;
+    --line:      #e7e5e4;
+    --line-2:    #f0ede8;
+    --accent:    #1f6feb;
+    --accent-fg: #ffffff;
+    --accent-soft: #e8efff;
+    --profit:    #15803d;
+    --profit-bg: #dcfce7;
+    --loss:      #b91c1c;
+    --loss-bg:   #fee2e2;
+    --warn:      #b45309;
+    --warn-bg:   #fef3c7;
+    --shadow-sm: 0 1px 0 rgba(24,24,27,0.04), 0 1px 2px rgba(24,24,27,0.04);
+    --shadow:    0 1px 0 rgba(24,24,27,0.04), 0 8px 24px -8px rgba(24,24,27,0.10);
+    --radius:    14px;
+    --radius-sm: 10px;
+    --radius-xs: 6px;
+    --gap:       18px;
+    --pad:       22px;
+  }
+
+  [data-palette="dusk"] {
+    --bg:        #0e0d0c;
+    --surface:   #1a1815;
+    --surface-2: #221f1b;
+    --ink:       #f5f1e8;
+    --ink-2:     #d6cfbf;
+    --muted:     #a39888;
+    --faint:     #6b6356;
+    --line:      #2a2620;
+    --line-2:    #221f1b;
+    --accent:    #f59e0b;
+    --accent-fg: #1a1208;
+    --accent-soft: #2a2010;
+    --profit:    #4ade80;
+    --profit-bg: #14271b;
+    --loss:      #f87171;
+    --loss-bg:   #2a1414;
+    --warn:      #fbbf24;
+    --warn-bg:   #2a200e;
+    --shadow-sm: 0 1px 0 rgba(0,0,0,0.4);
+    --shadow:    0 8px 24px -8px rgba(0,0,0,0.6);
+  }
+
+  [data-palette="mint"] {
+    --bg:        #f4f6f3;
+    --surface:   #ffffff;
+    --surface-2: #f8faf6;
+    --ink:       #14241c;
+    --ink-2:     #2c3e34;
+    --muted:     #6b7d72;
+    --faint:     #9aa89e;
+    --line:      #e3e8e1;
+    --line-2:    #ecf0e9;
+    --accent:    #1f7a4f;
+    --accent-fg: #ffffff;
+    --accent-soft: #d8ebe0;
+    --profit:    #1f7a4f;
+    --profit-bg: #d8ebe0;
+    --loss:      #b04444;
+    --loss-bg:   #f3dada;
+    --warn:      #a8761c;
+    --warn-bg:   #f4e8cf;
+  }
+
+  [data-palette="paper"] {
+    --bg:        #fafaf9;
+    --surface:   #ffffff;
+    --surface-2: #f5f5f4;
+    --ink:       #0a0a0a;
+    --ink-2:     #404040;
+    --muted:     #737373;
+    --faint:     #a3a3a3;
+    --line:      #e5e5e5;
+    --line-2:    #efefef;
+    --accent:    #0a0a0a;
+    --accent-fg: #fafaf9;
+    --accent-soft: #f0f0ef;
+    --profit:    #0a0a0a;
+    --profit-bg: #ececeb;
+    --loss:      #0a0a0a;
+    --loss-bg:   #ececeb;
+    --warn:      #0a0a0a;
+    --warn-bg:   #ececeb;
+  }
+
+  [data-density="compact"] { --pad: 14px; --gap: 12px; --radius: 10px; --radius-sm: 8px; }
+  [data-density="spacious"] { --pad: 30px; --gap: 26px; --radius: 18px; --radius-sm: 14px; }
+
+  html, body { height: 100%; }
+  body {
+    font-family: 'Geist', ui-sans-serif, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "ss01", "ss02", "cv11";
+    overflow-x: hidden;
+  }
+
+  .mono { font-family: 'Geist Mono', ui-monospace, monospace; font-feature-settings: "tnum"; }
+  .num  { font-variant-numeric: tabular-nums; }
+
+  #root { min-height: 100vh; }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--faint); }
+
+  button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+  a { color: inherit; text-decoration: none; }
+  input, select, textarea {
+    font-family: inherit;
+    color: var(--ink);
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    color-scheme: light dark;
+  }
+  [data-palette="dusk"] input, [data-palette="dusk"] select, [data-palette="dusk"] textarea { color-scheme: dark; }
+  input::placeholder, textarea::placeholder { color: var(--muted); }
+  [data-palette="dusk"] input::-webkit-calendar-picker-indicator { filter: invert(0.85); }
+  option { color: var(--ink); background: var(--surface); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+  }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.02em;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink-2);
+  }
+  .pill-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill-profit { background: var(--profit-bg); color: var(--profit); border-color: transparent; }
+  .pill-loss   { background: var(--loss-bg);   color: var(--loss);   border-color: transparent; }
+  .pill-warn   { background: var(--warn-bg);   color: var(--warn);   border-color: transparent; }
+  .pill-accent { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+
+  @media (max-width: 900px) {
+    [data-layout] { --gap: 14px; --pad: 16px; }
+  }
 </style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
 </head>
 <body>
+  <div id="root"></div>
 
-<!-- HEADER -->
-<header class="header">
-  <div class="header-left">
-    <div class="logo">AUTOBOT <span>v0.1</span></div>
-    <div class="price-ticker">
-      <div class="ticker-item">
-        <span class="ticker-symbol">BTC/EUR</span>
-        <span class="ticker-price" id="btc-price">--</span>
+  <script type="text/babel">
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+// =============================================================================
+// DATA FETCHING LAYER
+// =============================================================================
+
+function useApi(url, interval = 10000) {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+  useEffect(() => {
+    let mounted = true;
+    const load = () => fetch(url).then(r => r.json()).then(d => { if (mounted) setData(d); }).catch(e => { if (mounted) setError(e); });
+    load();
+    const t = setInterval(load, interval);
+    return () => { mounted = false; clearInterval(t); };
+  }, [url, interval]);
+  return { data, error };
+}
+
+function useWebSocket() {
+  const [connected, setConnected] = useState(false);
+  const [lastTick, setLastTick] = useState(null);
+  useEffect(() => {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${proto}//${location.host}/ws`);
+    ws.onopen = () => setConnected(true);
+    ws.onclose = () => setConnected(false);
+    ws.onmessage = (e) => { try { setLastTick(JSON.parse(e.data)); } catch {} };
+    return () => ws.close();
+  }, []);
+  return { connected, lastTick };
+}
+
+// =============================================================================
+// SVG CHARTING
+// =============================================================================
+
+function EquitySpark({ data, height = 220, showAxis = true }) {
+  const ref = useRef(null);
+  const [width, setWidth] = useState(800);
+  useEffect(() => {
+    if (!ref.current) return;
+    const ro = new ResizeObserver(entries => {
+      const w = entries[0].contentRect.width;
+      if (w > 0) setWidth(w);
+    });
+    ro.observe(ref.current);
+    return () => ro.disconnect();
+  }, []);
+  const padL = showAxis ? 56 : 4, padR = 8, padT = 10, padB = showAxis ? 22 : 4;
+  if (!data || data.length === 0) return <div ref={ref} style={{ width: '100%', height }} />;
+
+  const ys = data.map(d => d.equity);
+  const peaks = data.map(d => d.peak_equity || d.peak || d.equity);
+  const min = Math.min(...ys, ...peaks) * 0.995;
+  const max = Math.max(...ys, ...peaks) * 1.005;
+  const xRange = data.length - 1;
+  const sx = i => padL + (i / xRange) * (width - padL - padR);
+  const sy = v => padT + (1 - (v - min) / (max - min)) * (height - padT - padB);
+
+  const linePath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${sx(i).toFixed(1)} ${sy(d.equity).toFixed(1)}`).join(' ');
+  const areaPath = linePath + ` L ${sx(xRange)} ${height - padB} L ${sx(0)} ${height - padB} Z`;
+  const peakPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${sx(i).toFixed(1)} ${sy(peaks[i]).toFixed(1)}`).join(' ');
+
+  const last = data[data.length - 1];
+  const isLoss = last.equity < data[0].equity;
+  const lineColor = isLoss ? 'var(--loss)' : 'var(--accent)';
+  const yTicks = [min, (min + max) / 2, max];
+
+  return (
+    <div ref={ref} style={{ width: '100%' }}>
+    <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ width: '100%', height, display: 'block' }}>
+      <defs>
+        <linearGradient id="eqgrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={lineColor} stopOpacity="0.18" />
+          <stop offset="100%" stopColor={lineColor} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {showAxis && yTicks.map((t, i) => (
+        <g key={i}>
+          <line x1={padL} x2={width - padR} y1={sy(t)} y2={sy(t)} stroke="var(--line-2)" strokeWidth="1" strokeDasharray={i === 1 ? '0' : '2 4'} />
+          <text x={padL - 6} y={sy(t) + 3} fontSize="10" textAnchor="end" fill="var(--muted)" fontFamily="Geist Mono">€{t.toFixed(0)}</text>
+        </g>
+      ))}
+      <path d={peakPath} fill="none" stroke="var(--faint)" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
+      <path d={areaPath} fill="url(#eqgrad)" />
+      <path d={linePath} fill="none" stroke={lineColor} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={sx(xRange)} cy={sy(last.equity)} r="3.5" fill={lineColor} stroke="var(--surface)" strokeWidth="2" />
+    </svg>
+    </div>
+  );
+}
+
+function Sparkline({ data, color, height = 28 }) {
+  if (!data || data.length < 2) return null;
+  const w = 110;
+  const min = Math.min(...data) * 0.998;
+  const max = Math.max(...data) * 1.002;
+  const sx = i => (i / (data.length - 1)) * w;
+  const sy = v => (1 - (v - min) / (max - min)) * height;
+  const path = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${sx(i).toFixed(1)} ${sy(d).toFixed(1)}`).join(' ');
+  const area = path + ` L ${w} ${height} L 0 ${height} Z`;
+  return (
+    <svg viewBox={`0 0 ${w} ${height}`} preserveAspectRatio="none" style={{ width: '100%', height, display: 'block' }}>
+      <path d={area} fill={color} opacity="0.12" />
+      <path d={path} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function PriceChart({ bars, height = 360 }) {
+  if (!bars || bars.length === 0) return null;
+  const W = 1000;
+  const padL = 8, padR = 56, padT = 8, padB = 22;
+  const adxH = 60, volH = 50;
+  const priceH = height - adxH - volH - padT - padB;
+
+  const closes = bars.map(b => b.close);
+  const highs = bars.map(b => b.high);
+  const lows = bars.map(b => b.low);
+  const min = Math.min(...lows) * 0.995;
+  const max = Math.max(...highs) * 1.005;
+  const xN = bars.length;
+  const sx = i => padL + (i / (xN - 1)) * (W - padL - padR);
+  const sy = v => padT + (1 - (v - min) / (max - min)) * priceH;
+  const bw = Math.max(1.4, ((W - padL - padR) / xN) * 0.62);
+
+  const dchUpPath = bars.filter(b => b.donchian_upper != null).map((b, idx) => {
+    const i = bars.indexOf(b);
+    return `${idx === 0 ? 'M' : 'L'} ${sx(i).toFixed(1)} ${sy(b.donchian_upper).toFixed(1)}`;
+  }).join(' ');
+  const dchDnPath = bars.filter(b => b.donchian_lower != null).map((b, idx) => {
+    const i = bars.indexOf(b);
+    return `${idx === 0 ? 'M' : 'L'} ${sx(i).toFixed(1)} ${sy(b.donchian_lower).toFixed(1)}`;
+  }).join(' ');
+  const emaPath = bars.filter(b => b.ema_200 != null).map((b, idx) => {
+    const i = bars.indexOf(b);
+    return `${idx === 0 ? 'M' : 'L'} ${sx(i).toFixed(1)} ${sy(b.ema_200).toFixed(1)}`;
+  }).join(' ');
+
+  const upBars = bars.filter(b => b.donchian_upper != null && b.donchian_lower != null);
+  const bandArea = upBars.length > 1 ? (
+    upBars.map((b, idx) => { const i = bars.indexOf(b); return `${idx === 0 ? 'M' : 'L'} ${sx(i).toFixed(1)} ${sy(b.donchian_upper).toFixed(1)}`; }).join(' ')
+    + ' ' + upBars.slice().reverse().map(b => { const i = bars.indexOf(b); return `L ${sx(i).toFixed(1)} ${sy(b.donchian_lower).toFixed(1)}`; }).join(' ') + ' Z'
+  ) : '';
+
+  const vols = bars.map(b => b.volume);
+  const maxVol = Math.max(...vols);
+  const volTop = padT + priceH + 6;
+  const volBot = volTop + volH - 6;
+  const volScale = v => volBot - (v / maxVol) * (volH - 12);
+
+  const adxTop = volBot + 8;
+  const adxBot = adxTop + adxH - 8;
+  const adxScale = v => adxBot - (Math.min(60, v) / 60) * (adxH - 16);
+
+  const last = bars[bars.length - 1];
+  const isUp = last.close >= bars[0].close;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${height}`} preserveAspectRatio="none" style={{ width: '100%', height, display: 'block' }}>
+      {[0, 0.25, 0.5, 0.75, 1].map((t, i) => {
+        const v = min + (max - min) * (1 - t);
+        return (
+          <g key={i}>
+            <line x1={padL} x2={W - padR} y1={padT + t * priceH} y2={padT + t * priceH} stroke="var(--line-2)" strokeWidth="1" />
+            <text x={W - padR + 6} y={padT + t * priceH + 3} fontSize="10" fill="var(--muted)" fontFamily="Geist Mono">{v.toFixed(0)}</text>
+          </g>
+        );
+      })}
+      {bandArea && <path d={bandArea} fill="var(--accent)" opacity="0.05" />}
+      {dchUpPath && <path d={dchUpPath} fill="none" stroke="var(--accent)" strokeWidth="1" opacity="0.55" strokeDasharray="4 3" />}
+      {dchDnPath && <path d={dchDnPath} fill="none" stroke="var(--accent)" strokeWidth="1" opacity="0.55" strokeDasharray="4 3" />}
+
+      {bars.map((b, i) => {
+        const up = b.close >= b.open;
+        const color = up ? 'var(--profit)' : 'var(--loss)';
+        const x = sx(i);
+        const yo = sy(b.open), yc = sy(b.close);
+        const yh = sy(b.high), yl = sy(b.low);
+        const top = Math.min(yo, yc);
+        const bh = Math.max(0.5, Math.abs(yc - yo));
+        return (
+          <g key={i}>
+            <line x1={x} x2={x} y1={yh} y2={yl} stroke={color} strokeWidth="1" />
+            <rect x={x - bw / 2} y={top} width={bw} height={bh} fill={color} />
+          </g>
+        );
+      })}
+
+      {emaPath && <path d={emaPath} fill="none" stroke="var(--ink-2)" strokeWidth="1.5" opacity="0.7" />}
+
+      <line x1={padL} x2={W - padR} y1={sy(last.close)} y2={sy(last.close)} stroke={isUp ? 'var(--profit)' : 'var(--loss)'} strokeWidth="1" strokeDasharray="2 3" opacity="0.5" />
+      <rect x={W - padR + 1} y={sy(last.close) - 8} width={padR - 2} height={16} fill={isUp ? 'var(--profit)' : 'var(--loss)'} rx="3" />
+      <text x={W - padR / 2} y={sy(last.close) + 3} fontSize="10" textAnchor="middle" fill="white" fontFamily="Geist Mono" fontWeight="600">{last.close.toFixed(0)}</text>
+
+      <g>
+        <text x={padL} y={volTop + 12} fontSize="9" fill="var(--muted)" fontFamily="Geist Mono">VOL</text>
+        {bars.map((b, i) => (
+          <rect key={'v' + i} x={sx(i) - bw / 2} y={volScale(b.volume)} width={bw} height={Math.max(1, volBot - volScale(b.volume))} fill={b.close >= b.open ? 'var(--profit)' : 'var(--loss)'} opacity="0.45" />
+        ))}
+      </g>
+
+      <g>
+        <text x={padL} y={adxTop + 12} fontSize="9" fill="var(--muted)" fontFamily="Geist Mono">ADX(14)</text>
+        <line x1={padL} x2={W - padR} y1={adxScale(25)} y2={adxScale(25)} stroke="var(--warn)" strokeWidth="1" strokeDasharray="2 3" opacity="0.6" />
+        <text x={W - padR + 6} y={adxScale(25) + 3} fontSize="9" fill="var(--warn)" fontFamily="Geist Mono">25</text>
+        <path d={bars.filter(b => b.adx != null).map((b, idx) => { const i = bars.indexOf(b); return `${idx === 0 ? 'M' : 'L'} ${sx(i).toFixed(1)} ${adxScale(b.adx).toFixed(1)}`; }).join(' ')} fill="none" stroke="var(--ink-2)" strokeWidth="1.5" />
+      </g>
+    </svg>
+  );
+}
+
+// =============================================================================
+// SHARED COMPONENTS
+// =============================================================================
+
+function StatusDot({ state }) {
+  const color = state === 'killed' ? 'var(--loss)' : state === 'paused' ? 'var(--warn)' : 'var(--profit)';
+  return <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: color, boxShadow: `0 0 0 3px ${color}22`, marginRight: 6 }} />;
+}
+
+function Money({ value, decimals = 2, signed = false }) {
+  if (value == null || isNaN(value)) return <span className="num">—</span>;
+  const sign = value < 0 ? '−' : (signed && value > 0 ? '+' : '');
+  const abs = Math.abs(value);
+  const formatted = abs.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  return <span className="num">{sign}€{formatted}</span>;
+}
+
+function Pct({ value, signed = true, decimals = 2 }) {
+  if (value == null || isNaN(value)) return <span>—</span>;
+  const v = value * 100;
+  const sign = v < 0 ? '−' : (signed && v > 0 ? '+' : '');
+  return <span className="num">{sign}{Math.abs(v).toFixed(decimals)}%</span>;
+}
+
+function MetricCard({ label, children, accent, hint }) {
+  return (
+    <div className="card" style={{ padding: 'var(--pad)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+      <div className="num" style={{ fontSize: 26, fontWeight: 600, letterSpacing: '-0.02em', color: accent || 'var(--ink)' }}>{children}</div>
+      {hint && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{hint}</div>}
+    </div>
+  );
+}
+
+function SectionHeader({ title, count, hint, children }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em' }}>{title}</h3>
+        {count != null && <span className="pill" style={{ padding: '2px 8px', fontSize: 10 }}>{count}</span>}
+        {hint && <span style={{ fontSize: 12, color: 'var(--muted)' }}>· {hint}</span>}
       </div>
-      <div class="ticker-item">
-        <span class="ticker-symbol">ETH/EUR</span>
-        <span class="ticker-price" id="eth-price">--</span>
+      <div style={{ display: 'flex', gap: 6 }}>{children}</div>
+    </div>
+  );
+}
+
+function CoinIcon({ symbol, size = 32 }) {
+  const sym = (symbol || '').replace('/EUR', '').toLowerCase();
+  const fallbackBg = { btc: '#f7931a', eth: '#627eea', sol: '#00ffa3', xrp: '#23292f' }[sym] || '#666';
+  const [errored, setErrored] = useState(false);
+  if (errored) {
+    return (
+      <div style={{ width: size, height: size, borderRadius: '50%', background: fallbackBg, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.42, fontWeight: 700, fontFamily: 'Geist Mono' }}>{(sym || '?')[0].toUpperCase()}</div>
+    );
+  }
+  return (
+    <img src={`https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/svg/color/${sym}.svg`} alt={symbol} width={size} height={size} onError={() => setErrored(true)} style={{ width: size, height: size, borderRadius: '50%', background: '#fff', display: 'block', flexShrink: 0 }} />
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <div>
+      <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
+      <div className="num" style={{ fontWeight: 500, marginTop: 2 }}>{children}</div>
+    </div>
+  );
+}
+
+function EmptyState({ icon, title, text }) {
+  return (
+    <div style={{ padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, textAlign: 'center', color: 'var(--muted)' }}>
+      <div style={{ fontSize: 36, opacity: 0.3, fontFamily: 'Geist Mono' }}>{icon}</div>
+      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-2)' }}>{title}</div>
+      <div style={{ fontSize: 12, maxWidth: 280 }}>{text}</div>
+    </div>
+  );
+}
+
+// =============================================================================
+// DASHBOARD SCREEN
+// =============================================================================
+
+function Dashboard({ status, equity, positions, signals, trades, circuitBreakers, onKill, killArmed, setKillArmed }) {
+  const lastEq = status?.equity || 500;
+  const startEq = equity && equity.length > 0 ? equity[0].equity : lastEq;
+  const totalReturn = startEq > 0 ? (lastEq / startEq) - 1 : 0;
+  const peakEq = equity && equity.length > 0 ? Math.max(...equity.map(e => e.peak_equity || e.equity)) : lastEq;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr 1fr 1fr', gap: 'var(--gap)' }}>
+        <div className="card" style={{ padding: 'var(--pad)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total equity</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginTop: 6 }}>
+                <span className="num" style={{ fontSize: 44, fontWeight: 600, letterSpacing: '-0.03em', lineHeight: 1 }}>€{lastEq.toFixed(2)}</span>
+                <span className="num" style={{ fontSize: 14, fontWeight: 600, color: totalReturn >= 0 ? 'var(--profit)' : 'var(--loss)' }}>
+                  {totalReturn >= 0 ? '↑' : '↓'} <Pct value={totalReturn} />
+                </span>
+              </div>
+              <div style={{ marginTop: 4, fontSize: 12, color: 'var(--muted)' }}>from €{startEq.toFixed(2)} initial · peak €{peakEq.toFixed(2)}</div>
+            </div>
+            <div className="pill pill-accent" style={{ alignSelf: 'flex-start' }}><span className="pill-dot" />180D</div>
+          </div>
+          <div style={{ marginTop: 'auto' }}>
+            <EquitySpark data={equity} height={140} showAxis={false} />
+          </div>
+        </div>
+
+        <MetricCard label="Daily P&L" accent={(status?.daily_pnl || 0) >= 0 ? 'var(--profit)' : 'var(--loss)'} hint={<><Pct value={status?.daily_pnl_pct || 0} /> on session</>}>
+          <Money value={status?.daily_pnl || 0} signed />
+        </MetricCard>
+
+        <MetricCard label="Drawdown" accent={(status?.open_risk_pct || 0) > 10 ? 'var(--loss)' : 'var(--ink)'} hint="from peak equity">
+          <Pct value={equity && equity.length > 0 ? -(equity[equity.length - 1].drawdown_pct || 0) : 0} signed={false} decimals={1} />
+        </MetricCard>
+
+        <MetricCard label="Open risk" hint={`${(positions || []).length} of 3 slots in use`}>
+          {(status?.open_risk_pct || 0).toFixed(2)}%
+        </MetricCard>
       </div>
-    </div>
-    <div class="nav-tabs">
-      <button class="nav-tab active" onclick="switchTab('live')">Live</button>
-      <button class="nav-tab" onclick="switchTab('backtest')">Backtest</button>
-    </div>
-  </div>
-  <div class="header-right">
-    <span class="badge badge-dryrun" id="mode-badge">DRY-RUN</span>
-    <span class="uptime" id="uptime">00:00:00</span>
-    <div class="ws-indicator" id="ws-dot" title="WebSocket"></div>
-  </div>
-</header>
 
-<!-- MAIN CONTENT -->
-<main class="main">
+      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 'var(--gap)', alignItems: 'stretch' }}>
+        <div className="card" style={{ padding: 'var(--pad)' }}>
+          <SectionHeader title="Open positions" count={(positions || []).length} hint="auto-managed by trailing stop">
+            <span className="pill"><StatusDot state="ok" />trailing</span>
+          </SectionHeader>
+          {(!positions || positions.length === 0) ? (
+            <EmptyState icon="○" title="No open positions" text="Bot is scanning for breakouts on the next 4h bar close." />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
+              {positions.map(p => <PositionRow key={p.symbol} pos={p} />)}
+            </div>
+          )}
+        </div>
 
-  <!-- LIVE TAB -->
-  <div id="tab-live" class="tab-content active">
-
-  <!-- Status Cards -->
-  <section class="stats-row">
-    <div class="glass stat-card neutral">
-      <div class="stat-label">Total Equity</div>
-      <div class="stat-value" id="stat-equity">--</div>
-      <div class="stat-change" id="stat-equity-change"></div>
-    </div>
-    <div class="glass stat-card" id="pnl-card">
-      <div class="stat-label">Daily P&amp;L</div>
-      <div class="stat-value" id="stat-pnl">--</div>
-      <div class="stat-change" id="stat-pnl-pct"></div>
-    </div>
-    <div class="glass stat-card" id="dd-card">
-      <div class="stat-label">Drawdown</div>
-      <div class="stat-value" id="stat-drawdown">--</div>
-      <div class="stat-change">from peak</div>
-    </div>
-    <div class="glass stat-card neutral">
-      <div class="stat-label">Open Risk</div>
-      <div class="stat-value" id="stat-risk">--</div>
-      <div class="stat-change">of equity</div>
-    </div>
-  </section>
-
-  <!-- Price Chart + Positions -->
-  <section class="chart-positions-row">
-    <div class="glass chart-card">
-      <div class="chart-header">
-        <div class="chart-title">Price Chart</div>
-        <div class="chart-tabs">
-          <button class="chart-tab active" data-symbol="BTC" onclick="switchChart('BTC')">BTC/EUR</button>
-          <button class="chart-tab" data-symbol="ETH" onclick="switchChart('ETH')">ETH/EUR</button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
+          <CircuitBreakerCard cb={circuitBreakers} onKill={onKill} killArmed={killArmed} setKillArmed={setKillArmed} />
+          <NextBarCard status={status} />
         </div>
       </div>
-      <div id="price-chart"></div>
-    </div>
-    <div class="glass positions-panel">
-      <div class="panel-title">
-        Open Positions <span class="count" id="pos-count">0</span>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--gap)' }}>
+        <SignalLog signals={signals} />
+        <RecentTrades trades={(trades || []).slice(0, 7)} />
       </div>
-      <div id="positions-list">
-        <div class="no-positions">
-          <div class="no-positions-icon">&#9678;</div>
-          <div>No open positions</div>
+    </div>
+  );
+}
+
+function PositionRow({ pos }) {
+  const winning = (pos.unrealized_pnl || 0) >= 0;
+  const sym = pos.symbol.split('/')[0];
+  const r = pos.r_multiple || 0;
+  return (
+    <div style={{ padding: 14, borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)', border: '1px solid var(--line)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <CoinIcon symbol={sym} />
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{pos.symbol}</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)' }}>{pos.units} units · {pos.bars_in_trade} bars</div>
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div className="num" style={{ fontSize: 16, fontWeight: 600, color: winning ? 'var(--profit)' : 'var(--loss)' }}>
+            <Money value={pos.unrealized_pnl} signed />
+          </div>
+          <div className="num" style={{ fontSize: 11, color: winning ? 'var(--profit)' : 'var(--loss)' }}>
+            {r >= 0 ? '+' : ''}{r.toFixed(2)}R
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div style={{ position: 'relative', height: 6, background: 'var(--line)', borderRadius: 3 }}>
+          <div style={{ position: 'absolute', left: '25%', top: -3, bottom: -3, width: 1, background: 'var(--ink-2)', opacity: 0.5 }} />
+          <div style={{ position: 'absolute', left: r >= 0 ? '25%' : `${25 + r * 25}%`, width: r >= 0 ? `${Math.min(r * 25, 75)}%` : `${-r * 25}%`, top: 0, bottom: 0, background: winning ? 'var(--profit)' : 'var(--loss)', borderRadius: 3 }} />
+          <div style={{ position: 'absolute', left: `calc(${Math.max(0, Math.min(100, 25 + r * 25))}% - 6px)`, top: -3, width: 12, height: 12, borderRadius: '50%', background: winning ? 'var(--profit)' : 'var(--loss)', border: '2px solid var(--surface)' }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 10, color: 'var(--muted)', fontFamily: 'Geist Mono' }}>
+          <span>−1R stop</span><span>0R entry</span><span>+1R</span><span>+2R</span><span>+3R</span>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, fontSize: 12, paddingTop: 8, borderTop: '1px solid var(--line)' }}>
+        <Field label="Entry">€{pos.entry_price?.toFixed(2)}</Field>
+        <Field label="Mark">€{pos.current_price?.toFixed(2)}</Field>
+        <Field label="Stop">€{pos.stop_price?.toFixed(2)}</Field>
+        <Field label="Bars in">{pos.bars_in_trade}</Field>
+      </div>
+    </div>
+  );
+}
+
+function CircuitBreakerCard({ cb, onKill, killArmed, setKillArmed }) {
+  if (!cb) return null;
+  const status = cb.hard_kill ? 'killed' : cb.soft_pause ? 'paused' : 'ok';
+  const statusText = status === 'killed' ? 'HARD KILL — bot stopped' : status === 'paused' ? 'SOFT PAUSE — drawdown limit hit' : 'All systems operational';
+  const statusColor = status === 'killed' ? 'var(--loss)' : status === 'paused' ? 'var(--warn)' : 'var(--profit)';
+
+  return (
+    <div className="card" style={{ padding: 'var(--pad)' }}>
+      <SectionHeader title="Circuit breakers">
+        <span className="pill" style={{ background: status === 'killed' ? 'var(--loss-bg)' : status === 'paused' ? 'var(--warn-bg)' : 'var(--profit-bg)', color: statusColor, borderColor: 'transparent' }}>
+          <span className="pill-dot" />{status === 'ok' ? 'green' : status}
+        </span>
+      </SectionHeader>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 14 }}>
+        <CBRow label="Daily P&L" value={<Pct value={cb.daily_pnl_pct} />} threshold="−4%" violated={cb.daily_pnl_pct < -0.04} />
+        <CBRow label="Consec losses" value={cb.consecutive_losses} threshold="6" violated={cb.consecutive_losses >= 6} />
+        <CBRow label="Drawdown" value={<Pct value={-cb.drawdown_pct} signed={false} />} threshold="−10% / −20%" violated={cb.drawdown_pct >= 0.10} />
+        <CBRow label="Bot state" value={status === 'ok' ? 'Running' : status === 'paused' ? 'Paused' : 'Killed'} />
+      </div>
+
+      <div style={{ marginTop: 14, padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: status === 'killed' ? 'var(--loss-bg)' : status === 'paused' ? 'var(--warn-bg)' : 'var(--profit-bg)', color: statusColor, fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <StatusDot state={status} />{statusText}
+      </div>
+
+      <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Manual kill switch</div>
+        {!killArmed ? (
+          <button onClick={() => setKillArmed(true)} style={{ width: '100%', padding: '11px', borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)', border: '1px solid var(--line)', fontSize: 13, fontWeight: 600, color: 'var(--ink-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <span style={{ fontFamily: 'Geist Mono' }}>⏻</span> Arm kill switch
+          </button>
+        ) : (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setKillArmed(false)} style={{ flex: 1, padding: '11px', borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)', border: '1px solid var(--line)', fontSize: 13, fontWeight: 500, color: 'var(--ink-2)' }}>Cancel</button>
+            <button onClick={onKill} style={{ flex: 2, padding: '11px', borderRadius: 'var(--radius-sm)', background: 'var(--loss)', border: 'none', fontSize: 13, fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <span style={{ fontFamily: 'Geist Mono' }}>⏻</span> Kill bot · close all
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CBRow({ label, value, threshold, violated }) {
+  return (
+    <div style={{ padding: 12, borderRadius: 'var(--radius-sm)', background: violated ? 'var(--loss-bg)' : 'var(--surface-2)', border: '1px solid var(--line)' }}>
+      <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+      <div className="num" style={{ fontSize: 16, fontWeight: 600, marginTop: 2, color: violated ? 'var(--loss)' : 'var(--ink)' }}>{value}</div>
+      {threshold && <div className="num" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>limit {threshold}</div>}
+    </div>
+  );
+}
+
+function NextBarCard({ status }) {
+  const [secs, setSecs] = useState(0);
+  useEffect(() => {
+    if (!status?.next_bar_time) return;
+    const update = () => {
+      const diff = Math.max(0, Math.floor((new Date(status.next_bar_time) - new Date()) / 1000));
+      setSecs(diff);
+    };
+    update();
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
+  }, [status?.next_bar_time]);
+
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  const total = 4 * 3600;
+  const progress = 1 - secs / total;
+
+  return (
+    <div className="card" style={{ padding: 'var(--pad)' }}>
+      <SectionHeader title="Next 4h bar close" />
+      <div style={{ marginTop: 14 }}>
+        <div className="num" style={{ fontSize: 32, fontWeight: 600, letterSpacing: '-0.02em' }}>
+          {String(h).padStart(2,'0')}:{String(m).padStart(2,'0')}:{String(s).padStart(2,'0')}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>bot will scan all pairs at close</div>
+        <div style={{ marginTop: 12, height: 4, background: 'var(--line)', borderRadius: 2, overflow: 'hidden' }}>
+          <div style={{ width: `${Math.max(0, progress * 100)}%`, height: '100%', background: 'var(--accent)', borderRadius: 2 }} />
         </div>
       </div>
     </div>
-  </section>
+  );
+}
 
-  <!-- Equity Curve -->
-  <section class="glass equity-card">
-    <div class="chart-header">
-      <div class="chart-title">Equity Curve</div>
-      <div style="font-size:0.75rem;color:var(--text-secondary)">180 days</div>
-    </div>
-    <div class="equity-chart-wrapper"><canvas id="equity-chart"></canvas></div>
-  </section>
-
-  <!-- Trades + Circuit Breakers -->
-  <section class="bottom-row">
-    <div class="glass trades-card">
-      <div class="panel-title" style="margin-bottom:12px">
-        Trade History <span class="count" id="trade-count">0</span>
+function SignalLog({ signals }) {
+  const typeColor = { entry_check: 'var(--profit)', exit_check: 'var(--loss)', regime_filter: 'var(--warn)', volume_confirm: 'var(--accent)' };
+  if (!signals || signals.length === 0) return <div className="card" style={{ padding: 'var(--pad)' }}><SectionHeader title="Signal log" /><EmptyState icon="~" title="No signals yet" text="Signals will appear after the first bar scan." /></div>;
+  return (
+    <div className="card" style={{ padding: 'var(--pad)' }}>
+      <SectionHeader title="Signal log" hint="recent decisions" />
+      <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 320, overflowY: 'auto' }}>
+        {signals.map((s, i) => (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '70px 60px 1fr', gap: 10, padding: '8px 4px', alignItems: 'baseline', borderBottom: '1px solid var(--line-2)', fontSize: 12 }}>
+            <span style={{ fontSize: 9, fontWeight: 700, color: typeColor[s.signal_type] || 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{s.signal_type?.replace('_', ' ')}</span>
+            <span className="mono" style={{ color: 'var(--ink-2)', fontSize: 11 }}>{s.symbol}</span>
+            <span style={{ color: 'var(--ink-2)' }}>{s.reason}</span>
+          </div>
+        ))}
       </div>
-      <table class="trades-table">
+    </div>
+  );
+}
+
+function RecentTrades({ trades }) {
+  if (!trades || trades.length === 0) return <div className="card" style={{ padding: 'var(--pad)' }}><SectionHeader title="Recent trades" /><EmptyState icon="≡" title="No trades yet" text="Trades will appear after the first position is closed." /></div>;
+  return (
+    <div className="card" style={{ padding: 'var(--pad)' }}>
+      <SectionHeader title="Recent trades" hint="last closed" />
+      <table style={{ width: '100%', marginTop: 12, fontSize: 12, borderCollapse: 'collapse' }}>
         <thead>
-          <tr>
-            <th>Date</th>
-            <th>Pair</th>
-            <th>Entry</th>
-            <th>Exit</th>
-            <th>P&amp;L</th>
-            <th>R</th>
-            <th>Exit Reason</th>
+          <tr style={{ borderBottom: '1px solid var(--line)' }}>
+            {['Pair','P&L','R','Reason'].map(h => (
+              <th key={h} style={{ textAlign: 'left', padding: '8px 6px', fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
+            ))}
           </tr>
         </thead>
-        <tbody id="trades-body"></tbody>
+        <tbody>
+          {trades.map((t, i) => (
+            <tr key={t.id || i} style={{ borderBottom: '1px solid var(--line-2)' }}>
+              <td style={{ padding: '10px 6px', fontWeight: 500 }}>{t.symbol}</td>
+              <td className="num" style={{ padding: '10px 6px', color: t.pnl >= 0 ? 'var(--profit)' : 'var(--loss)', fontWeight: 600 }}><Money value={t.pnl} signed /></td>
+              <td className="num" style={{ padding: '10px 6px', color: t.r_multiple >= 0 ? 'var(--profit)' : 'var(--loss)' }}>{t.r_multiple >= 0 ? '+' : ''}{t.r_multiple?.toFixed(2)}R</td>
+              <td style={{ padding: '10px 6px' }}><span className="pill" style={{ fontSize: 10, padding: '2px 8px' }}>{t.exit_reason}</span></td>
+            </tr>
+          ))}
+        </tbody>
       </table>
     </div>
-    <div class="right-panel">
-      <div class="glass">
-        <div class="panel-title">Circuit Breakers</div>
-        <div class="cb-grid">
-          <div class="cb-item">
-            <div class="cb-label">Daily P&amp;L</div>
-            <div class="cb-value" id="cb-daily">--</div>
+  );
+}
+
+// =============================================================================
+// CHART SCREEN
+// =============================================================================
+
+function ChartScreen({ chartBtc, chartEth }) {
+  const [symbol, setSymbol] = useState('BTC');
+  const bars = symbol === 'BTC' ? chartBtc : chartEth;
+  if (!bars || bars.length === 0) return <div className="card" style={{ padding: 'var(--pad)' }}><EmptyState icon="◢" title="No chart data" text="Chart data will load after history is cached." /></div>;
+
+  const last = bars[bars.length - 1];
+  const first = bars[0];
+  const chg = (last.close - first.close) / first.close;
+  const high = Math.max(...bars.map(b => b.high));
+  const low = Math.min(...bars.map(b => b.low));
+  const isBullishTrend = last.ema_200 && last.close > last.ema_200;
+  const breakoutDist = last.donchian_upper ? (last.close - last.donchian_upper) / last.donchian_upper : 0;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
+      <div className="card" style={{ padding: 'var(--pad)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <CoinIcon symbol={symbol} />
+            <div>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 2 }}>
+                {['BTC','ETH'].map(s => (
+                  <button key={s} onClick={() => setSymbol(s)} style={{ padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600, background: symbol === s ? 'var(--accent-soft)' : 'transparent', color: symbol === s ? 'var(--accent)' : 'var(--muted)', border: '1px solid ' + (symbol === s ? 'transparent' : 'var(--line)') }}>{s}/EUR</button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                <span className="num" style={{ fontSize: 30, fontWeight: 600, letterSpacing: '-0.02em' }}>€{last.close.toFixed(2)}</span>
+                <span className="num" style={{ fontSize: 14, fontWeight: 600, color: chg >= 0 ? 'var(--profit)' : 'var(--loss)' }}>{chg >= 0 ? '↑' : '↓'} <Pct value={chg} /></span>
+              </div>
+            </div>
           </div>
-          <div class="cb-item">
-            <div class="cb-label">Consecutive Losses</div>
-            <div class="cb-value" id="cb-losses">--</div>
-          </div>
-          <div class="cb-item">
-            <div class="cb-label">Drawdown</div>
-            <div class="cb-value" id="cb-drawdown">--</div>
-          </div>
-          <div class="cb-item">
-            <div class="cb-label">Limit / Kill</div>
-            <div class="cb-value" id="cb-limits">-4% / -20%</div>
+          <div style={{ display: 'flex', gap: 16, fontSize: 11, color: 'var(--muted)' }}>
+            <Stat label="High" value={`€${high.toFixed(2)}`} />
+            <Stat label="Low" value={`€${low.toFixed(2)}`} />
+            <Stat label="EMA(200)" value={last.ema_200 ? `€${last.ema_200.toFixed(0)}` : '—'} accent={isBullishTrend ? 'var(--profit)' : 'var(--loss)'} />
+            <Stat label="ADX(14)" value={last.adx ? last.adx.toFixed(1) : '—'} accent={last.adx > 25 ? 'var(--profit)' : 'var(--muted)'} />
           </div>
         </div>
-        <div class="cb-status ok" id="cb-status">
-          <div class="cb-dot"></div>
-          <span>All systems operational</span>
+        <div style={{ marginTop: 16 }}>
+          <PriceChart bars={bars} height={440} />
         </div>
       </div>
-      <div class="glass" style="flex:1;min-height:200px">
-        <div class="panel-title">Signal Log</div>
-        <div class="signals-list" id="signals-list"></div>
+
+      <div className="card" style={{ padding: 'var(--pad)' }}>
+        <SectionHeader title="Strategy state" hint="Donchian breakout filter chain" />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginTop: 14 }}>
+          <FilterCard label="Trend filter" check={isBullishTrend} value={`Close ${isBullishTrend ? '>' : '<'} EMA(200)`} sub={isBullishTrend ? 'bullish — entries enabled' : 'bearish — no entries'} />
+          <FilterCard label="Trend strength" check={last.adx > 25} value={`ADX = ${last.adx?.toFixed(1) || '—'}`} sub={last.adx > 25 ? 'trending — pass' : 'weak — block'} />
+          <FilterCard label="Breakout" check={breakoutDist > 0} value={`${(breakoutDist * 100).toFixed(2)}% vs upper`} sub={breakoutDist > 0 ? 'price broke out' : 'no breakout'} />
+          <FilterCard label="Volume confirm" check={true} value="vol × 1.5 SMA" sub="confirmed" />
+        </div>
       </div>
     </div>
-  </section>
+  );
+}
 
-  </div><!-- end tab-live -->
+function Stat({ label, value, accent }) {
+  return (
+    <div>
+      <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+      <div className="num" style={{ fontSize: 14, fontWeight: 600, marginTop: 2, color: accent || 'var(--ink)' }}>{value}</div>
+    </div>
+  );
+}
 
-  <!-- BACKTEST TAB -->
-  <div id="tab-backtest" class="tab-content">
-
-    <section class="glass" style="padding:20px">
-      <div class="panel-title" style="margin-bottom:14px">Run Backtest</div>
-      <div class="bt-controls">
-        <select class="bt-select" id="bt-symbol">
-          <option value="BTC/EUR">BTC/EUR</option>
-          <option value="ETH/EUR">ETH/EUR</option>
-        </select>
-        <input class="bt-input" type="date" id="bt-start" value="2020-01-01">
-        <input class="bt-input" type="date" id="bt-end" value="">
-        <button class="bt-btn" id="bt-run" onclick="runBacktest()">Run Backtest</button>
-        <span class="bt-status" id="bt-status"></span>
+function FilterCard({ label, check, value, sub }) {
+  return (
+    <div style={{ padding: 14, borderRadius: 'var(--radius-sm)', background: check ? 'var(--profit-bg)' : 'var(--surface-2)', border: '1px solid ' + (check ? 'transparent' : 'var(--line)') }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+        <span style={{ width: 16, height: 16, borderRadius: '50%', background: check ? 'var(--profit)' : 'var(--faint)', color: '#fff', fontSize: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{check ? '✓' : '×'}</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
       </div>
-    </section>
+      <div className="num" style={{ fontSize: 14, fontWeight: 600, color: check ? 'var(--profit)' : 'var(--ink-2)' }}>{value}</div>
+      <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{sub}</div>
+    </div>
+  );
+}
 
-    <section id="bt-results" style="display:none">
-      <div class="glass" style="padding:20px">
-        <div class="panel-title" style="margin-bottom:14px">Performance Metrics</div>
-        <div class="bt-metrics-grid" id="bt-metrics"></div>
+// =============================================================================
+// TRADES SCREEN
+// =============================================================================
+
+function TradesScreen({ trades }) {
+  const [filter, setFilter] = useState('all');
+  const [sort, setSort] = useState('date');
+
+  const filtered = useMemo(() => {
+    if (!trades) return [];
+    let arr = [...trades];
+    if (filter === 'wins') arr = arr.filter(t => t.pnl > 0);
+    if (filter === 'losses') arr = arr.filter(t => t.pnl <= 0);
+    if (filter === 'btc') arr = arr.filter(t => t.symbol.includes('BTC'));
+    if (filter === 'eth') arr = arr.filter(t => t.symbol.includes('ETH'));
+    if (sort === 'pnl') arr.sort((a, b) => b.pnl - a.pnl);
+    if (sort === 'r') arr.sort((a, b) => b.r_multiple - a.r_multiple);
+    return arr;
+  }, [trades, filter, sort]);
+
+  if (!trades || trades.length === 0) return <div className="card" style={{ padding: 'var(--pad)' }}><EmptyState icon="≡" title="No trade history" text="Trades appear here after positions are closed." /></div>;
+
+  const wins = trades.filter(t => t.pnl > 0).length;
+  const winRate = wins / trades.length;
+  const totalPnl = trades.reduce((s, t) => s + t.pnl, 0);
+  const avgR = trades.reduce((s, t) => s + (t.r_multiple || 0), 0) / trades.length;
+  const bestR = Math.max(...trades.map(t => t.r_multiple || 0));
+  const worstR = Math.min(...trades.map(t => t.r_multiple || 0));
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 'var(--gap)' }}>
+        <MetricCard label="Total trades">{trades.length}</MetricCard>
+        <MetricCard label="Win rate" hint={`${wins} wins · ${trades.length - wins} losses`}>{(winRate * 100).toFixed(1)}%</MetricCard>
+        <MetricCard label="Total P&L" accent={totalPnl >= 0 ? 'var(--profit)' : 'var(--loss)'}><Money value={totalPnl} signed /></MetricCard>
+        <MetricCard label="Avg R" accent={avgR >= 0 ? 'var(--profit)' : 'var(--loss)'}>{avgR >= 0 ? '+' : ''}{avgR.toFixed(2)}R</MetricCard>
+        <MetricCard label="Best / Worst R">
+          <span style={{ color: 'var(--profit)' }}>+{bestR.toFixed(1)}</span>
+          <span style={{ color: 'var(--muted)', fontWeight: 400 }}> / </span>
+          <span style={{ color: 'var(--loss)' }}>{worstR.toFixed(1)}</span>
+        </MetricCard>
       </div>
 
-      <div class="glass" style="padding:16px">
-        <div class="chart-header">
-          <div class="chart-title">Backtest Equity Curve</div>
-          <div style="font-size:0.75rem;color:var(--text-secondary)" id="bt-period"></div>
+      <div className="card" style={{ padding: 'var(--pad)' }}>
+        <SectionHeader title="R-multiple distribution" />
+        <RDistribution trades={trades} />
+      </div>
+
+      <div className="card" style={{ padding: 'var(--pad)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+          <SectionHeader title="Trade history" count={filtered.length} />
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            {[['all','All'],['wins','Wins'],['losses','Losses'],['btc','BTC'],['eth','ETH']].map(([k, l]) => (
+              <button key={k} onClick={() => setFilter(k)} style={{ padding: '5px 11px', borderRadius: 6, fontSize: 11, fontWeight: 500, background: filter === k ? 'var(--accent-soft)' : 'transparent', color: filter === k ? 'var(--accent)' : 'var(--muted)', border: '1px solid ' + (filter === k ? 'transparent' : 'var(--line)') }}>{l}</button>
+            ))}
+            <select value={sort} onChange={e => setSort(e.target.value)} style={{ padding: '5px 10px', fontSize: 11, borderRadius: 6, border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--ink)' }}>
+              <option value="date">Sort: date</option>
+              <option value="pnl">Sort: P&L</option>
+              <option value="r">Sort: R</option>
+            </select>
+          </div>
         </div>
-        <div class="bt-equity-wrapper"><canvas id="bt-equity-chart"></canvas></div>
-      </div>
-
-      <div class="glass" style="padding:16px;overflow-x:auto">
-        <div class="panel-title" style="margin-bottom:12px">
-          Backtest Trades <span class="count" id="bt-trade-count">0</span>
-        </div>
-        <table class="trades-table">
+        <table style={{ width: '100%', marginTop: 14, fontSize: 12, borderCollapse: 'collapse' }}>
           <thead>
-            <tr>
-              <th>Entry</th>
-              <th>Exit</th>
-              <th>Pair</th>
-              <th>Entry Price</th>
-              <th>Exit Price</th>
-              <th>P&amp;L</th>
-              <th>R</th>
-              <th>Reason</th>
+            <tr style={{ borderBottom: '1px solid var(--line)' }}>
+              {['Pair','Entry','Exit','Units','P&L','R','Reason'].map(h => (
+                <th key={h} style={{ textAlign: 'left', padding: '10px 8px', fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
+              ))}
             </tr>
           </thead>
-          <tbody id="bt-trades-body"></tbody>
+          <tbody>
+            {filtered.map((t, i) => (
+              <tr key={t.id || i} style={{ borderBottom: '1px solid var(--line-2)' }}>
+                <td style={{ padding: '10px 8px', fontWeight: 500 }}>{t.symbol}</td>
+                <td className="num" style={{ padding: '10px 8px' }}>€{t.entry_price?.toFixed(2)}</td>
+                <td className="num" style={{ padding: '10px 8px' }}>€{t.exit_price?.toFixed(2)}</td>
+                <td className="num" style={{ padding: '10px 8px', color: 'var(--muted)' }}>{t.units}</td>
+                <td className="num" style={{ padding: '10px 8px', color: t.pnl >= 0 ? 'var(--profit)' : 'var(--loss)', fontWeight: 600 }}><Money value={t.pnl} signed /></td>
+                <td className="num" style={{ padding: '10px 8px', color: (t.r_multiple || 0) >= 0 ? 'var(--profit)' : 'var(--loss)' }}>{(t.r_multiple || 0) >= 0 ? '+' : ''}{(t.r_multiple || 0).toFixed(2)}</td>
+                <td style={{ padding: '10px 8px' }}><span className="pill" style={{ fontSize: 10, padding: '2px 8px' }}>{t.exit_reason}</span></td>
+              </tr>
+            ))}
+          </tbody>
         </table>
       </div>
-    </section>
-
-  </div><!-- end tab-backtest -->
-
-</main>
-
-<script>
-// =========================================================================
-// Dashboard JavaScript
-// =========================================================================
-
-const API = '';
-let equityChart = null;
-let ws = null;
-let currentSymbol = 'BTC';
-
-// --- Utility ---
-function fmt(n, decimals = 2) {
-  if (n == null || isNaN(n)) return '--';
-  return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    </div>
+  );
 }
 
-function fmtEur(n) {
-  if (n == null || isNaN(n)) return '--';
-  return '€' + fmt(n);
-}
-
-function fmtPct(n) {
-  if (n == null || isNaN(n)) return '--';
-  return (n >= 0 ? '+' : '') + fmt(n * 100, 2) + '%';
-}
-
-function fmtDate(iso) {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' ' +
-         d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-}
-
-function fmtDuration(seconds) {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
-}
-
-function colorClass(val) { return val >= 0 ? 'profit' : 'loss'; }
-
-// --- Animate number ---
-function animateValue(el, target, prefix = '', suffix = '', decimals = 2) {
-  const current = parseFloat(el.dataset.value || '0');
-  el.dataset.value = target;
-  const start = performance.now();
-  const duration = 600;
-  function step(now) {
-    const progress = Math.min((now - start) / duration, 1);
-    const eased = 1 - Math.pow(1 - progress, 3);
-    const val = current + (target - current) * eased;
-    el.textContent = prefix + fmt(val, decimals) + suffix;
-    if (progress < 1) requestAnimationFrame(step);
-  }
-  requestAnimationFrame(step);
-}
-
-// --- Fetch helpers ---
-async function fetchJSON(path) {
-  const res = await fetch(API + path);
-  return res.json();
-}
-
-// --- STATUS ---
-async function loadStatus() {
-  const s = await fetchJSON('/api/status');
-  const eqEl = document.getElementById('stat-equity');
-  animateValue(eqEl, s.equity, '€');
-  document.getElementById('stat-equity-change').textContent =
-    s.pairs.join(' · ');
-
-  const pnlEl = document.getElementById('stat-pnl');
-  pnlEl.className = 'stat-value ' + colorClass(s.daily_pnl);
-  animateValue(pnlEl, s.daily_pnl, '€');
-  document.getElementById('stat-pnl-pct').textContent = fmtPct(s.daily_pnl_pct / 100);
-  document.getElementById('pnl-card').className =
-    'glass stat-card ' + (s.daily_pnl >= 0 ? 'positive' : 'negative');
-
-  document.getElementById('uptime').textContent = fmtDuration(s.uptime_seconds);
-
-  const riskEl = document.getElementById('stat-risk');
-  animateValue(riskEl, s.open_risk_pct, '', '%', 1);
-
-  // Prices from chart data
-  updateTickerPrices();
-}
-
-function updateTickerPrices() {
-  // Updated separately after chart loads
-}
-
-// --- EQUITY CURVE ---
-async function loadEquityCurve() {
-  const data = await fetchJSON('/api/equity');
-  const labels = data.map(d => {
-    const dt = new Date(d.timestamp);
-    return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+function RDistribution({ trades }) {
+  const bins = {};
+  for (let r = -2; r <= 4; r += 0.5) bins[r.toFixed(1)] = 0;
+  trades.forEach(t => {
+    const r = Math.round((t.r_multiple || 0) * 2) / 2;
+    const k = Math.max(-2, Math.min(4, r)).toFixed(1);
+    bins[k] = (bins[k] || 0) + 1;
   });
-  const equities = data.map(d => d.equity);
-  const peaks = data.map(d => d.peak_equity);
-  const drawdowns = data.map(d => d.drawdown_pct);
-
-  // Update drawdown stat
-  const lastDD = drawdowns[drawdowns.length - 1] || 0;
-  const ddEl = document.getElementById('stat-drawdown');
-  ddEl.className = 'stat-value ' + (lastDD > 0.05 ? 'loss' : '');
-  animateValue(ddEl, lastDD * 100, '', '%', 1);
-  document.getElementById('dd-card').className =
-    'glass stat-card ' + (lastDD > 0.05 ? 'negative' : lastDD > 0.02 ? 'warning-state' : 'positive');
-
-  const ctx = document.getElementById('equity-chart').getContext('2d');
-  if (equityChart) equityChart.destroy();
-
-  const gradient = ctx.createLinearGradient(0, 0, 0, 200);
-  gradient.addColorStop(0, 'rgba(0, 212, 255, 0.25)');
-  gradient.addColorStop(1, 'rgba(0, 212, 255, 0.0)');
-
-  const ddGradient = ctx.createLinearGradient(0, 0, 0, 200);
-  ddGradient.addColorStop(0, 'rgba(255, 71, 87, 0.0)');
-  ddGradient.addColorStop(1, 'rgba(255, 71, 87, 0.12)');
-
-  equityChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: 'Equity',
-          data: equities,
-          borderColor: '#00d4ff',
-          backgroundColor: gradient,
-          borderWidth: 2,
-          fill: true,
-          tension: 0.3,
-          pointRadius: 0,
-          pointHitRadius: 10,
-        },
-        {
-          label: 'Peak',
-          data: peaks,
-          borderColor: 'rgba(255,255,255,0.15)',
-          borderWidth: 1,
-          borderDash: [4, 4],
-          fill: false,
-          tension: 0.3,
-          pointRadius: 0,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: 'rgba(10,10,26,0.9)',
-          borderColor: 'rgba(0,212,255,0.3)',
-          borderWidth: 1,
-          titleFont: { family: 'Inter' },
-          bodyFont: { family: 'JetBrains Mono', size: 12 },
-          callbacks: {
-            label: ctx => (ctx.dataset.label === 'Equity' ? '€' + fmt(ctx.raw) : ''),
-          },
-        },
-      },
-      scales: {
-        x: {
-          grid: { color: 'rgba(255,255,255,0.03)' },
-          ticks: { color: '#555', font: { size: 10 }, maxTicksLimit: 12 },
-        },
-        y: {
-          grid: { color: 'rgba(255,255,255,0.03)' },
-          ticks: { color: '#555', font: { family: 'JetBrains Mono', size: 10 }, callback: v => '€' + v },
-        },
-      },
-    },
-  });
+  const keys = Object.keys(bins).sort((a, b) => parseFloat(a) - parseFloat(b));
+  const max = Math.max(...keys.map(k => bins[k]), 1);
+  const w = 1000, h = 140;
+  const bw = (w - 20) / keys.length;
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ width: '100%', height: h, marginTop: 10 }}>
+      {keys.map((k, i) => {
+        const v = parseFloat(k);
+        const bh = (bins[k] / max) * (h - 30);
+        const x = 10 + i * bw;
+        const y = h - 22 - bh;
+        return (
+          <g key={k}>
+            <rect x={x + 2} y={y} width={bw - 4} height={bh} fill={v >= 0 ? 'var(--profit)' : 'var(--loss)'} opacity={Math.abs(v) < 0.1 ? 0.4 : 0.85} rx="2" />
+            {bins[k] > 0 && <text x={x + bw / 2} y={y - 4} textAnchor="middle" fontSize="10" fill="var(--ink-2)" fontFamily="Geist Mono" fontWeight="600">{bins[k]}</text>}
+            <text x={x + bw / 2} y={h - 6} textAnchor="middle" fontSize="10" fill="var(--muted)" fontFamily="Geist Mono">{v >= 0 ? '+' : ''}{v.toFixed(1)}R</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
 }
 
-// --- PRICE CHART (Plotly candlestick) ---
-async function loadPriceChart(symbol) {
-  const data = await fetchJSON('/api/chart/' + symbol);
-  if (!data.length) return;
+// =============================================================================
+// BACKTEST SCREEN
+// =============================================================================
 
-  // Update ticker price
-  const lastBar = data[data.length - 1];
-  if (symbol === 'BTC') {
-    document.getElementById('btc-price').textContent = fmtEur(lastBar.close);
-  } else {
-    document.getElementById('eth-price').textContent = fmtEur(lastBar.close);
-  }
+function BacktestScreen() {
+  const [running, setRunning] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+  const [symbol, setSymbol] = useState('BTC/EUR');
+  const [timeframe, setTimeframe] = useState('4h');
+  const [start, setStart] = useState('2023-01-01');
+  const [end, setEnd] = useState('');
 
-  const dates = data.map(d => new Date(d.timestamp));
-  const opens = data.map(d => d.open);
-  const highs = data.map(d => d.high);
-  const lows = data.map(d => d.low);
-  const closes = data.map(d => d.close);
-  const dUpper = data.map(d => d.donchian_upper);
-  const dLower = data.map(d => d.donchian_lower);
-  const ema = data.map(d => d.ema_200);
-
-  const traces = [
-    {
-      type: 'candlestick', x: dates,
-      open: opens, high: highs, low: lows, close: closes,
-      increasing: { line: { color: '#00ff88' }, fillcolor: 'rgba(0,255,136,0.3)' },
-      decreasing: { line: { color: '#ff4757' }, fillcolor: 'rgba(255,71,87,0.3)' },
-      name: symbol + '/EUR',
-      whiskerwidth: 0.4,
-    },
-    {
-      type: 'scatter', mode: 'lines', x: dates, y: dUpper,
-      line: { color: 'rgba(0,212,255,0.4)', width: 1, dash: 'dot' },
-      name: 'DC Upper', hoverinfo: 'skip',
-    },
-    {
-      type: 'scatter', mode: 'lines', x: dates, y: dLower,
-      line: { color: 'rgba(0,212,255,0.4)', width: 1, dash: 'dot' },
-      fill: 'tonexty', fillcolor: 'rgba(0,212,255,0.04)',
-      name: 'DC Lower', hoverinfo: 'skip',
-    },
-    {
-      type: 'scatter', mode: 'lines', x: dates, y: ema,
-      line: { color: 'rgba(255, 200, 50, 0.6)', width: 1.5, dash: 'dash' },
-      name: 'EMA 200',
-    },
-  ];
-
-  const layout = {
-    paper_bgcolor: 'transparent',
-    plot_bgcolor: 'transparent',
-    font: { family: 'Inter, system-ui', color: '#888', size: 11 },
-    margin: { l: 60, r: 20, t: 10, b: 40 },
-    xaxis: {
-      gridcolor: 'rgba(255,255,255,0.03)',
-      linecolor: 'rgba(255,255,255,0.05)',
-      rangeslider: { visible: false },
-      type: 'date',
-    },
-    yaxis: {
-      gridcolor: 'rgba(255,255,255,0.03)',
-      linecolor: 'rgba(255,255,255,0.05)',
-      side: 'right',
-      tickprefix: '€',
-    },
-    showlegend: false,
-    hovermode: 'x unified',
-    dragmode: 'pan',
+  const run = async () => {
+    setRunning(true); setError(null);
+    try {
+      const params = new URLSearchParams({ symbol, timeframe, start, end });
+      const res = await fetch(`/api/backtest?${params}`, { method: 'POST' });
+      const data = await res.json();
+      if (data.error) { setError(data.error); } else { setResult(data); }
+    } catch (e) { setError(e.message); }
+    setRunning(false);
   };
 
-  Plotly.newPlot('price-chart', traces, layout, {
-    responsive: true,
-    displayModeBar: false,
-    scrollZoom: true,
-  });
-}
-
-function switchChart(symbol) {
-  currentSymbol = symbol;
-  document.querySelectorAll('.chart-tab').forEach(tab => {
-    tab.classList.toggle('active', tab.dataset.symbol === symbol);
-  });
-  loadPriceChart(symbol);
-}
-
-// --- POSITIONS ---
-async function loadPositions() {
-  const positions = await fetchJSON('/api/positions');
-  const container = document.getElementById('positions-list');
-  document.getElementById('pos-count').textContent = positions.length;
-
-  if (!positions.length) {
-    container.innerHTML = `
-      <div class="no-positions">
-        <div class="no-positions-icon">&#9678;</div>
-        <div>No open positions</div>
-        <div style="font-size:0.75rem;color:var(--text-muted)">Waiting for entry signals...</div>
-      </div>`;
-    return;
-  }
-
-  container.innerHTML = positions.map(p => {
-    const pnlClass = p.unrealized_pnl >= 0 ? 'profit' : 'loss';
-    const rClass = p.r_multiple >= 0 ? 'profit' : 'loss';
-    return `
-      <div class="glass position-card">
-        <div class="position-header">
-          <span class="position-symbol">${p.symbol}</span>
-          <span class="position-side">LONG</span>
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
+      <div className="card" style={{ padding: 'var(--pad)' }}>
+        <SectionHeader title="Run backtest" hint="against cached OHLCV history" />
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 14 }}>
+          <Field2 label="Pair">
+            <select value={symbol} onChange={e => setSymbol(e.target.value)}>
+              <option>BTC/EUR</option><option>ETH/EUR</option><option>SOL/EUR</option><option>XRP/EUR</option>
+            </select>
+          </Field2>
+          <Field2 label="Timeframe">
+            <select value={timeframe} onChange={e => setTimeframe(e.target.value)}>
+              <option value="4h">4h</option><option value="1d">1d</option>
+            </select>
+          </Field2>
+          <Field2 label="Start">
+            <input type="date" value={start} onChange={e => setStart(e.target.value)} />
+          </Field2>
+          <Field2 label="End">
+            <input type="date" value={end} onChange={e => setEnd(e.target.value)} />
+          </Field2>
+          <button onClick={run} disabled={running} style={{ padding: '10px 22px', borderRadius: 'var(--radius-sm)', background: running ? 'var(--surface-2)' : 'var(--accent)', color: running ? 'var(--muted)' : 'var(--accent-fg)', fontWeight: 600, fontSize: 13 }}>
+            {running ? 'Running...' : 'Run backtest →'}
+          </button>
         </div>
-        <div class="position-grid">
-          <div>
-            <div class="position-field-label">Entry</div>
-            <div class="position-field-value">${fmtEur(p.entry_price)}</div>
+        {error && <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 'var(--radius-sm)', background: 'var(--loss-bg)', color: 'var(--loss)', fontSize: 12 }}>{error}</div>}
+      </div>
+
+      {result && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 'var(--gap)' }}>
+            <MetricCard label="Total return" accent="var(--profit)">+{result.metrics.total_return_pct?.toFixed(1)}%</MetricCard>
+            <MetricCard label="Sharpe">{result.metrics.sharpe?.toFixed(2) || '—'}</MetricCard>
+            <MetricCard label="Max drawdown" accent="var(--loss)">{result.metrics.max_drawdown_pct?.toFixed(1)}%</MetricCard>
+            <MetricCard label="Win rate">{result.metrics.win_rate_pct?.toFixed(1)}%</MetricCard>
+            <MetricCard label="Trades">{result.metrics.total_trades || result.trades?.length || 0}</MetricCard>
           </div>
-          <div>
-            <div class="position-field-label">Current</div>
-            <div class="position-field-value">${fmtEur(p.current_price)}</div>
-          </div>
-          <div>
-            <div class="position-field-label">P&L</div>
-            <div class="position-field-value ${pnlClass}">${fmtEur(p.unrealized_pnl)}</div>
-          </div>
-          <div>
-            <div class="position-field-label">R-Multiple</div>
-            <div class="position-field-value r-multiple ${rClass}">${p.r_multiple >= 0 ? '+' : ''}${fmt(p.r_multiple, 1)}R</div>
-          </div>
-          <div>
-            <div class="position-field-label">Stop</div>
-            <div class="position-field-value" style="color:var(--loss)">${fmtEur(p.stop_price)}</div>
-          </div>
-          <div>
-            <div class="position-field-label">Bars</div>
-            <div class="position-field-value">${p.bars_in_trade}</div>
-          </div>
+          {result.equity_curve && result.equity_curve.length > 0 && (
+            <div className="card" style={{ padding: 'var(--pad)' }}>
+              <SectionHeader title="Backtest equity curve" hint={`${symbol} · ${timeframe} · ${result.trades?.length || 0} trades`} />
+              <div style={{ marginTop: 14 }}>
+                <EquitySpark data={result.equity_curve.map((eq, i) => ({ equity: eq, peak_equity: eq }))} height={280} />
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function Field2({ label, children }) {
+  const child = React.Children.only(children);
+  const styled = React.cloneElement(child, {
+    style: { padding: '8px 12px', fontSize: 13, borderRadius: 'var(--radius-sm)', border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--ink)', fontFamily: 'Geist Mono', minWidth: 120, outline: 'none', ...(child.props.style || {}) },
+  });
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</label>
+      {styled}
+    </div>
+  );
+}
+
+// =============================================================================
+// STRATEGY SCREEN
+// =============================================================================
+
+function StrategyScreen() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
+      <div className="card" style={{ padding: 'var(--pad)' }}>
+        <SectionHeader title="Strategy" hint="Donchian breakout · trend-filtered · ATR-stopped" />
+        <p style={{ marginTop: 12, color: 'var(--muted)', fontSize: 13, maxWidth: 760, lineHeight: 1.55 }}>
+          Long-only Donchian channel breakout on the 4h chart, gated by a daily EMA(200) trend filter,
+          ADX(14) regime confirmation, and a volume-confirm rule. Risk is fixed-fractional per trade
+          using an ATR-based stop. Exits are managed by a trailing ATR stop, time-stop, or breakdown of
+          the lower channel.
+        </p>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--gap)' }}>
+        <ConfigCard title="Entry rules" rows={[['Bias filter', 'Close > EMA(200) on 1d'], ['Regime', 'ADX(14) ≥ 25'], ['Trigger', 'Close > Donchian upper (20)'], ['Volume confirm', 'vol > 1.5 × SMA(20)']]} />
+        <ConfigCard title="Exit rules" rows={[['Protective stop', '2.0 × ATR(14) below entry'], ['Trailing stop', '3.0 × ATR(14) below high'], ['Time stop', '30 bars · R < 0.5 · ADX < 20'], ['Hard exit', 'close < Donchian lower (20)']]} />
+        <ConfigCard title="Position sizing" rows={[['Risk per trade', '10% of equity'], ['Max open trades', '3'], ['Portfolio heat cap', '30% of equity'], ['Order type', 'market entry · stop-market exit']]} />
+        <ConfigCard title="Circuit breakers" rows={[['Daily P&L limit', '−4.0% (24h pause)'], ['Consecutive losses', '6 (24h pause)'], ['Soft pause DD', '−10% from peak'], ['Hard kill DD', '−20% from peak (stop bot)']]} />
+        <ConfigCard title="Universe" rows={[['Pairs', 'BTC/EUR · ETH/EUR · SOL/EUR · XRP/EUR'], ['Exchange', 'Kraken'], ['Timeframe', '4h'], ['Quote currency', 'EUR']]} />
+        <ConfigCard title="Mode & fees" rows={[['Mode', 'Live'], ['Initial capital', '€500.00'], ['Maker fee', '0.25%'], ['Taker fee', '0.40%']]} />
+      </div>
+      <div className="card" style={{ padding: 'var(--pad)', background: 'var(--surface-2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 999, background: 'var(--warn-bg)', color: 'var(--warn)' }}>READ-ONLY</span>
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>Strategy parameters are loaded from <span className="mono">config/config.live.json</span>. Edit the file and restart the bot to apply changes.</span>
         </div>
-      </div>`;
-  }).join('');
+      </div>
+    </div>
+  );
 }
 
-// --- TRADES ---
-async function loadTrades() {
-  const trades = await fetchJSON('/api/trades');
-  document.getElementById('trade-count').textContent = trades.length;
-  const tbody = document.getElementById('trades-body');
-  tbody.innerHTML = trades.slice(0, 15).map(t => {
-    const pnlClass = t.pnl >= 0 ? 'pnl-positive' : 'pnl-negative';
-    const rClass = t.r_multiple >= 0 ? 'pnl-positive' : 'pnl-negative';
-    const exitLabel = t.exit_reason.replace(/_/g, ' ');
-    return `
-      <tr>
-        <td>${fmtDate(t.exit_time)}</td>
-        <td>${t.symbol}</td>
-        <td>${fmtEur(t.entry_price)}</td>
-        <td>${fmtEur(t.exit_price)}</td>
-        <td class="${pnlClass}">${t.pnl >= 0 ? '+' : ''}${fmtEur(t.pnl)}</td>
-        <td class="${rClass}">${t.r_multiple >= 0 ? '+' : ''}${fmt(t.r_multiple, 1)}R</td>
-        <td><span class="exit-badge">${exitLabel}</span></td>
-      </tr>`;
-  }).join('');
+function ConfigCard({ title, rows }) {
+  return (
+    <div className="card" style={{ padding: 'var(--pad)' }}>
+      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>{title}</div>
+      <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+        <tbody>
+          {rows.map(([k, v]) => (
+            <tr key={k} style={{ borderBottom: '1px solid var(--line-2)' }}>
+              <td style={{ padding: '8px 0', color: 'var(--muted)', width: '45%' }}>{k}</td>
+              <td className="mono" style={{ padding: '8px 0', textAlign: 'right', fontWeight: 500 }}>{v}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
-// --- CIRCUIT BREAKERS ---
-async function loadCircuitBreakers() {
-  const cb = await fetchJSON('/api/circuit-breakers');
-  document.getElementById('cb-daily').textContent = fmtPct(cb.daily_pnl_pct);
-  document.getElementById('cb-daily').style.color =
-    cb.daily_pnl_pct < -0.03 ? 'var(--loss)' : 'var(--text-primary)';
-  document.getElementById('cb-losses').textContent = cb.consecutive_losses;
-  document.getElementById('cb-drawdown').textContent = fmtPct(-cb.drawdown_pct);
+// =============================================================================
+// LAYOUT — SIDEBAR (default)
+// =============================================================================
 
-  const statusEl = document.getElementById('cb-status');
-  if (cb.hard_kill) {
-    statusEl.className = 'cb-status killed';
-    statusEl.innerHTML = '<div class="cb-dot"></div><span>HARD KILL — All trading halted</span>';
-  } else if (cb.soft_pause) {
-    statusEl.className = 'cb-status paused';
-    statusEl.innerHTML = '<div class="cb-dot"></div><span>PAUSED — No new entries</span>';
-  } else {
-    statusEl.className = 'cb-status ok';
-    statusEl.innerHTML = '<div class="cb-dot"></div><span>All systems operational</span>';
-  }
+const NAV = [
+  { id: 'dashboard', label: 'Dashboard', icon: '◐' },
+  { id: 'chart', label: 'Charts', icon: '◢' },
+  { id: 'trades', label: 'Trades', icon: '≡' },
+  { id: 'backtest', label: 'Backtest', icon: '↻' },
+  { id: 'strategy', label: 'Strategy', icon: '☰' },
+];
+
+function Logo() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ width: 26, height: 26, borderRadius: 7, background: 'var(--accent)', color: 'var(--accent-fg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, fontFamily: 'Geist Mono', letterSpacing: '-0.05em' }}>A</div>
+      <div>
+        <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: '-0.02em', lineHeight: 1 }}>autobot</div>
+        <div style={{ fontSize: 9, color: 'var(--muted)', fontFamily: 'Geist Mono', letterSpacing: '0.04em' }}>v0.1 · kraken</div>
+      </div>
+    </div>
+  );
 }
 
-// --- SIGNALS ---
-async function loadSignals() {
-  const signals = await fetchJSON('/api/signals');
-  const container = document.getElementById('signals-list');
-  container.innerHTML = signals.map(s => {
-    const cls = s.signal_type.includes('entry') ? 'entry' :
-                s.signal_type.includes('exit') ? 'exit' : '';
-    return `
-      <div class="signal-item ${cls}">
-        <div class="signal-time">${fmtDate(s.timestamp)}</div>
-        <span class="signal-symbol">${s.symbol}</span>
-        <span class="signal-text">${s.reason}</span>
-      </div>`;
-  }).join('');
+function ModeBadge({ status }) {
+  const killed = status?.health === 'killed';
+  return (
+    <span className="pill" style={{ background: killed ? 'var(--loss-bg)' : 'var(--warn-bg)', color: killed ? 'var(--loss)' : 'var(--warn)', borderColor: 'transparent' }}>
+      <StatusDot state={killed ? 'killed' : 'ok'} />{status?.mode === 'live' ? 'LIVE' : killed ? 'STOPPED' : 'DRY-RUN'}
+    </span>
+  );
 }
 
-// --- WEBSOCKET ---
-function connectWebSocket() {
-  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  ws = new WebSocket(protocol + '//' + location.host + '/ws');
+function Ticker({ symbol, bars }) {
+  if (!bars || bars.length === 0) return null;
+  const last = bars[bars.length - 1];
+  const recent = bars.slice(-30).map(b => b.close);
+  const first = recent[0];
+  const chg = (last.close - first) / first;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 6px', borderRadius: 8 }}>
+      <CoinIcon symbol={symbol} size={28} />
+      <div style={{ minWidth: 0, flex: '0 0 auto' }}>
+        <div style={{ fontSize: 11, color: 'var(--ink)', fontWeight: 600, lineHeight: 1.1 }}>{symbol}/EUR</div>
+        <div className="num" style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginTop: 3, lineHeight: 1 }}>€{last.close.toFixed(0)}</div>
+      </div>
+      <div style={{ flex: 1, minWidth: 40, height: 24 }}>
+        <Sparkline data={recent} color={chg >= 0 ? 'var(--profit)' : 'var(--loss)'} height={24} />
+      </div>
+      <div className="num" style={{ fontSize: 11, fontWeight: 600, color: chg >= 0 ? 'var(--profit)' : 'var(--loss)', textAlign: 'right', flex: '0 0 auto' }}>
+        {chg >= 0 ? '↑' : '↓'}{(Math.abs(chg) * 100).toFixed(1)}%
+      </div>
+    </div>
+  );
+}
 
-  ws.onopen = () => {
-    document.getElementById('ws-dot').classList.add('connected');
+function KilledBanner({ onResume }) {
+  return (
+    <div style={{ padding: '10px 16px', background: 'var(--loss)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, fontWeight: 500 }}>
+      <span>⏻  Bot stopped. All positions force-closed at market.</span>
+      <button onClick={onResume} style={{ padding: '5px 14px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: 'rgba(255,255,255,0.18)', color: '#fff' }}>Resume</button>
+    </div>
+  );
+}
+
+// =============================================================================
+// MAIN APP
+// =============================================================================
+
+function App() {
+  const [route, setRoute] = useState('dashboard');
+  const [killArmed, setKillArmed] = useState(false);
+
+  const { data: status } = useApi('/api/status', 5000);
+  const { data: equity } = useApi('/api/equity', 15000);
+  const { data: positions } = useApi('/api/positions', 5000);
+  const { data: trades } = useApi('/api/trades', 30000);
+  const { data: signals } = useApi('/api/signals', 10000);
+  const { data: circuitBreakers } = useApi('/api/circuit-breakers', 5000);
+  const { data: chartBtc } = useApi('/api/chart/BTC', 30000);
+  const { data: chartEth } = useApi('/api/chart/ETH', 30000);
+  const { connected } = useWebSocket();
+
+  const killed = status?.health === 'killed';
+
+  const onKill = async () => {
+    await fetch('/api/stop', { method: 'POST' });
+    setKillArmed(false);
+  };
+  const onResume = async () => {
+    await fetch('/api/resume', { method: 'POST' });
   };
 
-  ws.onmessage = (event) => {
-    const msg = JSON.parse(event.data);
-    if (msg.type === 'equity_tick') {
-      const el = document.getElementById('stat-equity');
-      animateValue(el, msg.equity, '€');
-    }
-  };
+  const screen =
+    route === 'dashboard' ? <Dashboard status={status} equity={equity} positions={positions} signals={signals} trades={trades} circuitBreakers={circuitBreakers} onKill={onKill} killArmed={killArmed} setKillArmed={setKillArmed} /> :
+    route === 'chart' ? <ChartScreen chartBtc={chartBtc} chartEth={chartEth} /> :
+    route === 'trades' ? <TradesScreen trades={trades} /> :
+    route === 'backtest' ? <BacktestScreen /> :
+    route === 'strategy' ? <StrategyScreen /> :
+    <Dashboard status={status} equity={equity} positions={positions} signals={signals} trades={trades} circuitBreakers={circuitBreakers} onKill={onKill} killArmed={killArmed} setKillArmed={setKillArmed} />;
 
-  ws.onclose = () => {
-    document.getElementById('ws-dot').classList.remove('connected');
-    setTimeout(connectWebSocket, 3000);
-  };
+  return (
+    <div data-palette="dusk" data-density="balanced" data-layout="sidebar" style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)' }}>
+      <div style={{ display: 'flex', minHeight: '100vh' }}>
+        {/* Sidebar */}
+        <aside style={{ width: 240, flexShrink: 0, background: 'var(--surface)', borderRight: '1px solid var(--line)', padding: '20px 14px', display: 'flex', flexDirection: 'column', gap: 18, position: 'sticky', top: 0, height: '100vh' }}>
+          <div style={{ padding: '0 6px' }}><Logo /></div>
 
-  ws.onerror = () => {
-    ws.close();
-  };
+          <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {NAV.map(n => (
+              <button key={n.id} onClick={() => setRoute(n.id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, fontSize: 13, fontWeight: 500, background: route === n.id ? 'var(--accent-soft)' : 'transparent', color: route === n.id ? 'var(--accent)' : 'var(--ink-2)', textAlign: 'left' }}>
+                <span style={{ fontFamily: 'Geist Mono', fontSize: 13, opacity: 0.8 }}>{n.icon}</span>
+                {n.label}
+              </button>
+            ))}
+          </nav>
+
+          <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', padding: '0 6px' }}>Live ticker</div>
+            <div style={{ padding: '8px', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)' }}>
+              <Ticker symbol="BTC" bars={chartBtc} />
+            </div>
+            <div style={{ padding: '8px', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)' }}>
+              <Ticker symbol="ETH" bars={chartEth} />
+            </div>
+            <div style={{ padding: '8px 6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 10, color: 'var(--muted)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: connected ? 'var(--profit)' : 'var(--loss)', boxShadow: connected ? '0 0 0 3px var(--profit-bg)' : '0 0 0 3px var(--loss-bg)' }} />
+                <span style={{ fontFamily: 'Geist Mono' }}>{connected ? 'WS connected' : 'disconnected'}</span>
+              </span>
+            </div>
+          </div>
+        </aside>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {killed && <KilledBanner onResume={onResume} />}
+          <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 28px', borderBottom: '1px solid var(--line)', background: 'var(--surface)', position: 'sticky', top: 0, zIndex: 10 }}>
+            <div>
+              <div style={{ fontSize: 19, fontWeight: 600, letterSpacing: '-0.02em', textTransform: 'capitalize' }}>{route}</div>
+              <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                {route === 'dashboard' && 'Live state of the bot'}
+                {route === 'chart' && '4h candles · Donchian / EMA / ADX overlays'}
+                {route === 'trades' && 'Closed positions and outcomes'}
+                {route === 'backtest' && 'Run strategy on historical data'}
+                {route === 'strategy' && 'Read-only configuration & rules'}
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <ModeBadge status={status} />
+            </div>
+          </header>
+
+          <main style={{ padding: '24px 28px 60px', maxWidth: 1480 }}>
+            {screen}
+          </main>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-// --- INIT ---
-async function init() {
-  try {
-    await Promise.all([
-      loadStatus(),
-      loadEquityCurve(),
-      loadPriceChart(currentSymbol),
-      loadPositions(),
-      loadTrades(),
-      loadCircuitBreakers(),
-      loadSignals(),
-    ]);
-
-    // Load the other ticker price
-    const otherSymbol = currentSymbol === 'BTC' ? 'ETH' : 'BTC';
-    const otherData = await fetchJSON('/api/chart/' + otherSymbol);
-    if (otherData.length) {
-      const lastBar = otherData[otherData.length - 1];
-      document.getElementById(otherSymbol.toLowerCase() + '-price').textContent = fmtEur(lastBar.close);
-    }
-  } catch (e) {
-    console.error('Init error:', e);
-  }
-
-  connectWebSocket();
-
-  // Refresh data periodically
-  setInterval(loadStatus, 10000);
-  setInterval(loadPositions, 15000);
-  setInterval(loadCircuitBreakers, 30000);
-
-  // Update uptime every second
-  setInterval(async () => {
-    const s = await fetchJSON('/api/status');
-    document.getElementById('uptime').textContent = fmtDuration(s.uptime_seconds);
-  }, 5000);
-}
-
-// --- TAB SWITCHING ---
-function switchTab(tab) {
-  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
-  document.getElementById('tab-' + tab).classList.add('active');
-  document.querySelector(`.nav-tab[onclick="switchTab('${tab}')"]`).classList.add('active');
-}
-
-// --- BACKTEST ---
-let btEquityChart = null;
-
-async function runBacktest() {
-  const symbol = document.getElementById('bt-symbol').value;
-  const start = document.getElementById('bt-start').value;
-  const end = document.getElementById('bt-end').value;
-  const btn = document.getElementById('bt-run');
-  const status = document.getElementById('bt-status');
-
-  btn.disabled = true;
-  status.textContent = 'Running backtest...';
-
-  try {
-    const params = new URLSearchParams({ symbol, start, timeframe: '4h' });
-    if (end) params.set('end', end);
-
-    const res = await fetch('/api/backtest?' + params.toString(), { method: 'POST' });
-    const data = await res.json();
-
-    if (data.error) {
-      status.textContent = data.error;
-      btn.disabled = false;
-      return;
-    }
-
-    if (data.metrics.total_trades === 0) {
-      status.textContent = 'Backtest complete — no trades generated. Try a longer date range or check strategy parameters.';
-      btn.disabled = false;
-      return;
-    }
-
-    renderBacktestResults(data);
-    status.textContent = `Completed: ${data.metrics.total_trades} trades`;
-  } catch (e) {
-    status.textContent = 'Error: ' + e.message;
-  }
-  btn.disabled = false;
-}
-
-function renderBacktestResults(data) {
-  document.getElementById('bt-results').style.display = '';
-
-  // Metrics
-  const m = data.metrics;
-  const metricCards = [
-    { label: 'Total Return', value: (m.total_return_pct >= 0 ? '+' : '') + m.total_return_pct + '%', color: m.total_return_pct >= 0 ? 'var(--profit)' : 'var(--loss)' },
-    { label: 'Final Equity', value: '€' + fmt(m.final_equity), color: '' },
-    { label: 'Total Trades', value: m.total_trades, color: '' },
-    { label: 'Win Rate', value: m.win_rate + '%', color: m.win_rate >= 40 ? 'var(--profit)' : 'var(--loss)' },
-    { label: 'Profit Factor', value: fmt(m.profit_factor, 2), color: m.profit_factor >= 1 ? 'var(--profit)' : 'var(--loss)' },
-    { label: 'Sharpe Ratio', value: fmt(m.sharpe_ratio, 2), color: m.sharpe_ratio >= 0.5 ? 'var(--profit)' : 'var(--loss)' },
-    { label: 'Sortino Ratio', value: fmt(m.sortino_ratio, 2), color: '' },
-    { label: 'Max Drawdown', value: m.max_drawdown_pct + '%', color: 'var(--loss)' },
-    { label: 'Avg Winner', value: '€' + fmt(m.avg_winner), color: 'var(--profit)' },
-    { label: 'Avg Loser', value: '€' + fmt(m.avg_loser), color: 'var(--loss)' },
-    { label: 'Expectancy (R)', value: fmt(m.expectancy_r, 3), color: m.expectancy_r >= 0 ? 'var(--profit)' : 'var(--loss)' },
-    { label: 'Total Fees', value: '€' + fmt(m.total_fees), color: '' },
-    { label: 'Best Trade', value: '€' + fmt(m.best_trade), color: 'var(--profit)' },
-    { label: 'Worst Trade', value: '€' + fmt(m.worst_trade), color: 'var(--loss)' },
-    { label: 'Max Consec. Losses', value: m.max_consecutive_losses, color: '' },
-    { label: 'Calmar Ratio', value: fmt(m.calmar_ratio, 2), color: '' },
-  ];
-
-  document.getElementById('bt-metrics').innerHTML = metricCards.map(c =>
-    `<div class="bt-metric-card">
-      <div class="bt-metric-label">${c.label}</div>
-      <div class="bt-metric-value" style="color:${c.color || 'var(--text-primary)'}">${c.value}</div>
-    </div>`
-  ).join('');
-
-  // Equity curve
-  const ec = data.equity_curve;
-  if (ec.length > 0) {
-    document.getElementById('bt-period').textContent =
-      fmtDate(ec[0].timestamp) + ' — ' + fmtDate(ec[ec.length - 1].timestamp);
-  }
-
-  const labels = ec.map((e, i) => {
-    if (i % Math.max(1, Math.floor(ec.length / 30)) === 0) {
-      const d = new Date(e.timestamp);
-      return d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
-    }
-    return '';
-  });
-  const equities = ec.map(e => e.equity);
-  const peaks = ec.map(e => e.peak_equity);
-
-  const ctx = document.getElementById('bt-equity-chart').getContext('2d');
-  if (btEquityChart) btEquityChart.destroy();
-
-  const grad = ctx.createLinearGradient(0, 0, 0, 250);
-  grad.addColorStop(0, 'rgba(0, 212, 255, 0.25)');
-  grad.addColorStop(1, 'rgba(0, 212, 255, 0.0)');
-
-  btEquityChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: 'Equity', data: equities, borderColor: '#00d4ff',
-          backgroundColor: grad, borderWidth: 2, fill: true, tension: 0.2,
-          pointRadius: 0, pointHitRadius: 8,
-        },
-        {
-          label: 'Peak', data: peaks, borderColor: 'rgba(255,255,255,0.12)',
-          borderWidth: 1, borderDash: [4, 4], fill: false, tension: 0.2, pointRadius: 0,
-        },
-      ],
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: { legend: { display: false },
-        tooltip: {
-          backgroundColor: 'rgba(10,10,26,0.9)', borderColor: 'rgba(0,212,255,0.3)', borderWidth: 1,
-          bodyFont: { family: 'JetBrains Mono', size: 12 },
-          callbacks: { label: ctx => ctx.dataset.label === 'Equity' ? '€' + fmt(ctx.raw) : '' },
-        },
-      },
-      scales: {
-        x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#555', font: { size: 10 }, maxTicksLimit: 15 } },
-        y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#555', font: { family: 'JetBrains Mono', size: 10 }, callback: v => '€' + v } },
-      },
-    },
-  });
-
-  // Trades table
-  const trades = data.trades;
-  document.getElementById('bt-trade-count').textContent = trades.length;
-  document.getElementById('bt-trades-body').innerHTML = trades.map(t => {
-    const pnlClass = t.pnl >= 0 ? 'pnl-positive' : 'pnl-negative';
-    const rClass = t.r_multiple >= 0 ? 'pnl-positive' : 'pnl-negative';
-    return `<tr>
-      <td>${fmtDate(t.entry_time)}</td>
-      <td>${fmtDate(t.exit_time)}</td>
-      <td>${t.symbol}</td>
-      <td>${fmtEur(t.entry_price)}</td>
-      <td>${fmtEur(t.exit_price)}</td>
-      <td class="${pnlClass}">${t.pnl >= 0 ? '+' : ''}${fmtEur(t.pnl)}</td>
-      <td class="${rClass}">${t.r_multiple >= 0 ? '+' : ''}${fmt(t.r_multiple, 1)}R</td>
-      <td><span class="exit-badge">${t.exit_reason.replace(/_/g, ' ')}</span></td>
-    </tr>`;
-  }).join('');
-}
-
-document.addEventListener('DOMContentLoaded', init);
-</script>
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
 </body>
 </html>

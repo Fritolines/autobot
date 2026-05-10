@@ -93,6 +93,8 @@ def run_backtest(
 
     if df_daily is not None and len(df_daily) > 0:
         df_daily = df_daily.copy()
+        if "timestamp" in df_daily.columns:
+            df_daily["timestamp"] = pd.to_datetime(df_daily["timestamp"], utc=True)
 
     equity = initial_capital
     peak_equity = initial_capital
@@ -110,6 +112,16 @@ def run_backtest(
         bar = df.iloc[i]
         history = df.iloc[max(0, i - 250) : i + 1]
         timestamp = bar.get("timestamp", i)
+
+        # Slice daily data to prevent look-ahead bias
+        daily_slice = None
+        if df_daily is not None and len(df_daily) > 0 and "timestamp" in df_daily.columns:
+            current_ts = pd.Timestamp(timestamp, tz="UTC") if not hasattr(timestamp, 'tz') else timestamp
+            daily_slice = df_daily[df_daily["timestamp"] <= current_ts]
+            if len(daily_slice) == 0:
+                daily_slice = None
+        elif df_daily is not None and len(df_daily) > 0:
+            daily_slice = df_daily
 
         for symbol in available_symbols:
             pos = positions.get(symbol)
@@ -149,7 +161,7 @@ def run_backtest(
                 # Check entry
                 open_pos_list = [p.to_dict() for p in positions.values()]
                 entry_signal = check_entry(
-                    history, df_daily, symbol, equity, open_pos_list, None, config,
+                    history, daily_slice, symbol, equity, open_pos_list, None, config,
                 )
                 if entry_signal:
                     units = compute_position_size(
@@ -270,23 +282,23 @@ def _compute_metrics(result: BacktestResult, initial_capital: float) -> dict:
         "total_trades": len(trades),
         "winning_trades": len(wins),
         "losing_trades": len(losses),
-        "win_rate": round(len(wins) / len(trades) * 100, 1) if trades else 0,
-        "total_return_pct": round(total_return * 100, 2),
-        "final_equity": round(final_equity, 2),
-        "total_pnl": round(sum(pnls), 2),
-        "avg_pnl": round(np.mean(pnls), 2),
-        "avg_winner": round(np.mean(wins), 2) if wins else 0,
-        "avg_loser": round(np.mean(losses), 2) if losses else 0,
-        "best_trade": round(max(pnls), 2),
-        "worst_trade": round(min(pnls), 2),
-        "profit_factor": round(profit_factor, 2),
-        "sharpe_ratio": round(sharpe, 2),
-        "sortino_ratio": round(sortino, 2),
-        "calmar_ratio": round(calmar, 2),
-        "max_drawdown_pct": round(max_dd * 100, 2),
+        "win_rate": float(round(len(wins) / len(trades) * 100, 1)) if trades else 0,
+        "total_return_pct": float(round(total_return * 100, 2)),
+        "final_equity": float(round(final_equity, 2)),
+        "total_pnl": float(round(sum(pnls), 2)),
+        "avg_pnl": float(round(np.mean(pnls), 2)),
+        "avg_winner": float(round(np.mean(wins), 2)) if wins else 0,
+        "avg_loser": float(round(np.mean(losses), 2)) if losses else 0,
+        "best_trade": float(round(max(pnls), 2)),
+        "worst_trade": float(round(min(pnls), 2)),
+        "profit_factor": float(round(profit_factor, 2)),
+        "sharpe_ratio": float(round(sharpe, 2)),
+        "sortino_ratio": float(round(sortino, 2)),
+        "calmar_ratio": float(round(calmar, 2)),
+        "max_drawdown_pct": float(round(max_dd * 100, 2)),
         "max_consecutive_losses": max_consec_losses,
         "max_drawdown_bars": max_dd_bars,
-        "expectancy_r": round(avg_r, 3),
-        "avg_r_multiple": round(avg_r, 2),
-        "total_fees": round(sum(t.fees for t in trades), 2),
+        "expectancy_r": float(round(avg_r, 3)),
+        "avg_r_multiple": float(round(avg_r, 2)),
+        "total_fees": float(round(sum(t.fees for t in trades), 2)),
     }
