@@ -6,18 +6,29 @@ from __future__ import annotations
 
 import json
 import os
-import signal
+import re
 import sys
 from pathlib import Path
 
 import uvicorn
+from dotenv import load_dotenv
 
 from src.logging_config import setup_logging
 
 CONFIG_DIR = Path(__file__).parent.parent / "config"
 
 
+def _resolve_env_vars(config_text: str) -> str:
+    """Replace ${VAR_NAME} placeholders with environment variable values."""
+    def replacer(match):
+        var_name = match.group(1)
+        return os.environ.get(var_name, "")
+    return re.sub(r"\$\{([^}]+)\}", replacer, config_text)
+
+
 def main():
+    load_dotenv(Path(__file__).parent.parent / ".env")
+
     mode = os.environ.get("BOT_MODE", "dryrun")
     config_file = CONFIG_DIR / f"config.{mode}.json"
 
@@ -28,7 +39,8 @@ def main():
 
     setup_logging(mode=mode)
 
-    config = json.loads(config_file.read_text())
+    config_text = _resolve_env_vars(config_file.read_text())
+    config = json.loads(config_text)
     host = config.get("dashboard", {}).get("host", "127.0.0.1")
     port = config.get("dashboard", {}).get("port", 8000)
 

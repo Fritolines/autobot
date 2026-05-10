@@ -7,10 +7,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
+from dotenv import load_dotenv
 
 from src.database.db import init_db, fetch_circuit_breaker_state, fetch_positions
 from src.data_handler.fetcher import get_exchange, fetch_ohlcv, fetch_daily_ohlcv
@@ -29,13 +32,29 @@ from src.portfolio_manager.portfolio import (
 
 logger = logging.getLogger(__name__)
 
-CONFIG_PATH = Path(__file__).parent.parent / "config" / "config.dryrun.json"
+_ROOT_DIR = Path(__file__).parent.parent
+CONFIG_DIR = _ROOT_DIR / "config"
+
+load_dotenv(_ROOT_DIR / ".env")
+
+
+def _resolve_env_vars(text: str) -> str:
+    """Replace ${VAR_NAME} placeholders with environment variable values."""
+    return re.sub(r"\$\{([^}]+)\}", lambda m: os.environ.get(m.group(1), ""), text)
+
+
+def _load_config() -> dict:
+    mode = os.environ.get("BOT_MODE", "dryrun")
+    config_file = CONFIG_DIR / f"config.{mode}.json"
+    if not config_file.exists():
+        config_file = CONFIG_DIR / "config.dryrun.json"
+    return json.loads(_resolve_env_vars(config_file.read_text()))
 
 
 class TradingBot:
     def __init__(self, config: dict | None = None):
         if config is None:
-            config = json.loads(CONFIG_PATH.read_text())
+            config = _load_config()
         self.config = config
         self.running = False
         self.mode = config.get("mode", "dryrun")
@@ -263,9 +282,10 @@ class TradingBot:
                         )
 
     def _next_bar_close(self, now: datetime) -> datetime:
-        """Calculate next 4h bar close (UTC 00/04/08/12/16/20)."""
+        """Calculate next bar close based on configured timeframe."""
+        tf_hours = {"1h": 1, "4h": 4, "1d": 24}.get(self.timeframe, 4)
         current_hour = now.hour
-        next_bar_hour = ((current_hour // 4) + 1) * 4
+        next_bar_hour = ((current_hour // tf_hours) + 1) * tf_hours
         if next_bar_hour >= 24:
             next_day = now.date() + timedelta(days=1)
             return datetime(next_day.year, next_day.month, next_day.day, 0, 0, 0, tzinfo=timezone.utc)

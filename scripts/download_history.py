@@ -30,6 +30,8 @@ BINANCE_VISION_BASE = "https://data.binance.vision/data/spot/monthly/klines"
 SYMBOL_MAP = {
     "BTC/EUR": "BTCEUR",
     "ETH/EUR": "ETHEUR",
+    "SOL/EUR": "SOLEUR",
+    "XRP/EUR": "XRPEUR",
     "BTC/USDT": "BTCUSDT",
     "ETH/USDT": "ETHUSDT",
 }
@@ -132,11 +134,11 @@ def main():
     parser.add_argument("--timeframe", default="4h", help="Timeframe (default: 4h)")
     parser.add_argument("--start", default="2020-01-01", help="Start date YYYY-MM-DD")
     parser.add_argument("--end", default=None, help="End date YYYY-MM-DD (default: now)")
-    parser.add_argument("--all-pairs", action="store_true", help="Download BTC/EUR and ETH/EUR")
+    parser.add_argument("--all-pairs", action="store_true", help="Download all configured pairs")
     args = parser.parse_args()
 
     if args.all_pairs:
-        for sym in ["BTC/EUR", "ETH/EUR"]:
+        for sym in ["BTC/EUR", "ETH/EUR", "SOL/EUR", "XRP/EUR"]:
             download_history(sym, args.timeframe, args.start, args.end)
             # Also download daily for EMA(200)
             download_history(sym, "1d", args.start, args.end)
