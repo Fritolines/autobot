@@ -255,6 +255,7 @@ def reconcile_positions(exchange: ccxt.Exchange, db_positions: list[dict], pairs
     Returns list of warnings/actions taken.
     """
     warnings = []
+    DUST_THRESHOLD = 1e-4
 
     try:
         balance = exchange.fetch_balance()
@@ -268,18 +269,18 @@ def reconcile_positions(exchange: ccxt.Exchange, db_positions: list[dict], pairs
         db_pos = next((p for p in db_positions if p["symbol"] == symbol), None)
         db_units = db_pos["units"] if db_pos else 0
 
-        if abs(exchange_amount - db_units) > 1e-8:
-            if db_pos and exchange_amount < 1e-8:
+        if abs(exchange_amount - db_units) > DUST_THRESHOLD:
+            if db_pos and exchange_amount < DUST_THRESHOLD:
                 warnings.append(
                     f"MISMATCH {symbol}: DB has {db_units} units but exchange has 0. "
                     f"Position may have been stopped out externally."
                 )
-            elif not db_pos and exchange_amount > 1e-8:
+            elif not db_pos and exchange_amount > DUST_THRESHOLD:
                 warnings.append(
                     f"MISMATCH {symbol}: Exchange has {exchange_amount} {base} but DB has no position. "
                     f"Manual intervention needed."
                 )
-            elif db_pos and abs(exchange_amount - db_units) / max(db_units, 1e-8) > 0.01:
+            elif db_pos and abs(exchange_amount - db_units) / max(db_units, DUST_THRESHOLD) > 0.01:
                 warnings.append(
                     f"MISMATCH {symbol}: DB={db_units}, Exchange={exchange_amount}. "
                     f"Partial fill or external trade detected."
