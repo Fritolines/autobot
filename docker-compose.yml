@@ -1,0 +1,28 @@
+services:
+  bot:
+    build: .
+    container_name: autobot
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      # Bound to localhost only — access via SSH tunnel: ssh -L 8000:localhost:8000 user@your-vps
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/status"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+  watchdog:
+    build: ./watchdog
+    container_name: autobot-watchdog
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - bot

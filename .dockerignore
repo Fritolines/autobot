@@ -1,0 +1,15 @@
+.env
+.git
+.claude
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+tests/
+data/
+logs/
+*.db
+*.parquet
+.venv
+venv/
