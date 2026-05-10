@@ -15,7 +15,7 @@ from pathlib import Path
 import pandas as pd
 from dotenv import load_dotenv
 
-from src.database.db import init_db, fetch_circuit_breaker_state, fetch_positions
+from src.database.db import init_db, fetch_circuit_breaker_state, fetch_positions, fetch_trades
 from src.data_handler.fetcher import get_exchange, fetch_ohlcv, fetch_daily_ohlcv
 from src.data_handler.cache import load_cached, save_cache
 from src.indicator_engine.indicators import ema
@@ -69,6 +69,9 @@ class TradingBot:
         self.circuit_breaker: CircuitBreakerStateMachine | None = None
         self.last_bar_time: datetime | None = None
         self.ws_broadcast = None  # set by app.py
+        self._exchange_equity: float = float(config.get("initial_capital", 500))
+        self._mark_prices: dict[str, float] = {}
+        self._signals: list[dict] = []
 
         tg_cfg = config.get("telegram", {})
         self.notifier = TelegramNotifier(
@@ -90,6 +93,14 @@ class TradingBot:
                 taker_fee=self.config.get("fees", {}).get("taker_pct", 0.004),
             )
             self._reconcile()
+            self._sync_equity()
+            if self.circuit_breaker and not fetch_trades(limit=1):
+                self.circuit_breaker.peak_equity = self._exchange_equity
+                self.circuit_breaker.drawdown_pct = 0.0
+                self.circuit_breaker.soft_pause = False
+                self.circuit_breaker.hard_kill = False
+                self.circuit_breaker._save()
+                logger.info(f"Fresh start: peak_equity set to {self._exchange_equity:.2f}")
         else:
             self.live_executor = None
 
@@ -119,7 +130,40 @@ class TradingBot:
                 for p in positions
             )
             return self.paper_executor.balance + unrealized
-        return self.paper_executor.balance
+        return self._exchange_equity
+
+    def _sync_equity(self):
+        """Refresh equity from exchange: EUR cash + mark-to-market position value."""
+        if not self.live_executor:
+            return
+        try:
+            balance = self.live_executor.fetch_balance()
+            eur = float(balance.get("EUR", {}).get("total", 0) or 0)
+            position_value = 0.0
+            for symbol in self.pairs:
+                base = symbol.split("/")[0]
+                amount = float(balance.get(base, {}).get("total", 0) or 0)
+                if amount > 1e-6 and symbol in self._mark_prices:
+                    position_value += amount * self._mark_prices[symbol]
+            self._exchange_equity = eur + position_value
+            logger.info(
+                f"Exchange equity: {self._exchange_equity:.2f} EUR "
+                f"(cash={eur:.2f}, positions={position_value:.2f})"
+            )
+        except Exception as e:
+            logger.error(f"Failed to sync equity: {e}")
+
+    def _add_signal(self, symbol: str, signal_type: str, price: float, reason: str):
+        """Cache a signal decision for the dashboard."""
+        self._signals.append({
+            "symbol": symbol,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "signal_type": signal_type,
+            "price": round(price, 2),
+            "reason": reason,
+        })
+        if len(self._signals) > 200:
+            self._signals = self._signals[-200:]
 
     async def run_loop(self):
         """Main loop: wait for bar close, then process."""
@@ -164,7 +208,8 @@ class TradingBot:
             except Exception as e:
                 logger.error(f"Error processing {symbol}: {e}", exc_info=True)
 
-        # Update equity
+        if self.mode == "live":
+            self._sync_equity()
         equity = self.get_equity()
         peak = max(equity, self.circuit_breaker.peak_equity if self.circuit_breaker else equity)
         record_equity(equity, peak)
@@ -213,6 +258,9 @@ class TradingBot:
         # Compute indicators
         df_4h = compute_indicators(df_4h, self.config)
 
+        if len(df_4h) > 0:
+            self._mark_prices[symbol] = float(df_4h.iloc[-1]["close"])
+
         # Get current state
         positions = get_open_positions()
         cb_state = fetch_circuit_breaker_state()
@@ -248,6 +296,8 @@ class TradingBot:
                             config=self.config.get("circuit_breakers", {}),
                         )
                     logger.info(f"EXIT {symbol}: {exit_signal.reason}, PnL={pnl:.2f} ({r_mult:.1f}R)")
+                    self._add_signal(symbol, "exit", exit_signal.price,
+                        f"{exit_signal.reason}, PnL={pnl:.2f} ({r_mult:.1f}R)")
                     await self.notifier.notify_exit(
                         symbol, exit_signal.price, pnl, r_mult, exit_signal.reason
                     )
@@ -277,6 +327,8 @@ class TradingBot:
                             f"ENTRY {symbol}: {units} @ {entry_signal.price:.2f}, "
                             f"stop={entry_signal.stop_price:.2f}"
                         )
+                        self._add_signal(symbol, "entry", entry_signal.price,
+                            "; ".join(entry_signal.reasons))
                         await self.notifier.notify_entry(
                             symbol, units, entry_signal.price, entry_signal.stop_price, equity
                         )
