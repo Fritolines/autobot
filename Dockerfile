@@ -19,7 +19,8 @@ RUN pip install --no-cache-dir \
     "pydantic>=2.0.0" \
     "aiosqlite>=0.20.0" \
     "websockets>=12.0" \
-    "python-dotenv>=1.0.0"
+    "python-dotenv>=1.0.0" \
+    "pyarrow>=14.0.0"
 
 COPY . .
 
